@@ -5,8 +5,8 @@
 # ---------------------------------------------------------------------------
 <#
 .SYNOPSIS
-    Auto-commits and pushes source changes in this repository to vishnuu0001/DVV_StratIQ
-  GitHub remote, on a schedule.
+    Auto-commits and pushes source changes in this repository to
+  vishnuu0001/vinvisdiv on a schedule.
 
 .DESCRIPTION
   Respects .gitignore (.venv, node_modules, build/dist output, runtime DB/log files
@@ -19,7 +19,7 @@
 $ErrorActionPreference = 'Continue'
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $LogFile  = Join-Path $PSScriptRoot 'auto-git-sync.log'
-$ExpectedRemote = 'https://github.com/vishnuu0001/DVV_StratIQ.git'
+$ExpectedRemote = 'https://github.com/vishnuu0001/vinvisdiv.git'
 $PublishedCommitFile = Join-Path $PSScriptRoot '.last-published-commit'
 $MaximumGitBlobBytes = 95MB
 $ProductionBranch = 'main'
@@ -62,19 +62,16 @@ try {
     }
 
     $currentBranch = (git branch --show-current 2>$null).Trim()
-    if ($LASTEXITCODE -ne 0 -or $currentBranch -ne $ProductionBranch) {
-        Write-Log "Skipping auto-publish on branch '$currentBranch'; production branch is '$ProductionBranch'."
-        exit 0
-    }
-
-    # Keep the remote commit from before the push. On the first run there may be
-    # no publish marker yet; after a successful push origin/main already equals
-    # HEAD and can no longer describe what this release changed.
-    $remoteHeadBeforePush = (git rev-parse "origin/$ProductionBranch" 2>$null).Trim()
-    if ($LASTEXITCODE -ne 0 -or -not $remoteHeadBeforePush) {
-        Write-Log "ERROR: origin/$ProductionBranch could not be resolved."
+    if ($LASTEXITCODE -ne 0 -or -not $currentBranch) {
+        Write-Log 'ERROR: Could not determine the current branch. Nothing was committed.'
         exit 1
     }
+
+    # Keep the remote commit from before the push. This is required only when
+    # main is published; feature branches are committed and pushed without
+    # changing production.
+    $remoteHeadBeforePush = (git rev-parse "origin/$currentBranch" 2>$null).Trim()
+    $remoteBranchExists = $LASTEXITCODE -eq 0 -and $remoteHeadBeforePush
 
     # Generated modernization workspaces are ignored at repository level, so
     # standard staging includes source changes without sweeping in runtime data.
@@ -113,9 +110,13 @@ try {
 
     # GitHub is the release source of truth. Never publish a local-only commit:
     # push first, then deploy the exact commit now present on origin/main.
-    $aheadCount = [int](git rev-list --count "origin/$ProductionBranch..HEAD")
+    $aheadCount = if ($remoteBranchExists) {
+        [int](git rev-list --count "origin/$currentBranch..HEAD")
+    } else {
+        [int](git rev-list --count HEAD)
+    }
     if ($aheadCount -gt 0) {
-        $pushOut = git push origin $ProductionBranch 2>&1
+        $pushOut = git push --set-upstream origin $currentBranch 2>&1
         if ($LASTEXITCODE -eq 0) {
             Write-Log "Pushed $aheadCount local commit(s) successfully."
         } else {
@@ -124,6 +125,16 @@ try {
         }
     } else {
         Write-Log 'GitHub already matches the local branch.'
+    }
+
+    if ($currentBranch -ne $ProductionBranch) {
+        Write-Log "Branch '$currentBranch' was synchronized; production publishing is restricted to '$ProductionBranch'."
+        exit 0
+    }
+
+    if (-not $remoteBranchExists) {
+        Write-Log "ERROR: The previous origin/$ProductionBranch commit could not be resolved; skipping production publish."
+        exit 1
     }
 
     $publishedCommit = if (Test-Path -LiteralPath $PublishedCommitFile) {
