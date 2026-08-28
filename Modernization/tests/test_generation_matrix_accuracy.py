@@ -13,6 +13,7 @@ from api.server import _STACK_LANGUAGE_TOOL
 from services.build_runner import BuildResult, run_build
 from services.modernizer.build_artifacts import (
     _backend_manifest_files,
+    _java_inferred_dependencies,
     _normalize_java_output_path_separators,
     _reconcile_java_console_logging_calls,
     _reconcile_java_generation_output,
@@ -31,6 +32,49 @@ from services.modernizer.scaffolds.polyglot import generate_polyglot_project
 
 
 class GenerationMatrixAccuracyTests(unittest.TestCase):
+    def test_java_legacy_imports_add_their_maven_dependencies(self):
+        dependencies = _java_inferred_dependencies({
+            "Legacy.java": (
+                "import com.google.gson.Gson;\n"
+                "import org.apache.commons.dbcp2.BasicDataSource;\n"
+                "import org.apache.struts.action.ActionForm;\n"
+                "import org.apache.struts.tiles.TilesRequestProcessor;\n"
+            )
+        })
+
+        self.assertIn(("com.google.code.gson", "gson", "2.11.0"), dependencies)
+        self.assertIn(("org.apache.commons", "commons-dbcp2", "2.12.0"), dependencies)
+        self.assertIn(("org.apache.struts", "struts-core", "1.3.10"), dependencies)
+        self.assertIn(("org.apache.struts", "struts-tiles", "1.3.10"), dependencies)
+
+    def test_java_reconciliation_removes_nonexistent_self_member_imports(self):
+        path = "Demo/backend/orders/src/main/java/com/example/OrderService.java"
+        output = {
+            path: (
+                "package com.example;\n"
+                "import com.example.OrderService.from;\n"
+                "import com.example.OrderService.to;\n"
+                "import com.example.util.used;\n"
+                "import com.example.Legacy.SQLException;\n"
+                "import java.sql.SQLException;\n"
+                "public class OrderService { SQLException failure; }\n"
+            )
+        }
+
+        _reconcile_java_generation_output(
+            output, "Demo", {"backend_tech": "Java 21 Spring Boot 3"},
+        )
+
+        reconciled = next(
+            content for source_path, content in output.items()
+            if source_path.endswith("/OrderService.java")
+        )
+        self.assertNotIn("OrderService.from", reconciled)
+        self.assertNotIn("OrderService.to", reconciled)
+        self.assertNotIn("com.example.util.used", reconciled)
+        self.assertNotIn("com.example.Legacy.SQLException", reconciled)
+        self.assertIn("java.sql.SQLException", reconciled)
+
     # Function: test_java_repair_context_extracts_maven_provider_symbols
     def test_java_repair_context_extracts_maven_provider_symbols(self):
         identifiers = _pf_build_error_identifiers([

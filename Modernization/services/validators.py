@@ -962,6 +962,21 @@ def _validate_java(rel_path: str, content: str, tmp_dir: Path) -> ValidationResu
         _java_import_diagnostics(content)
         + _spring_boot3_semantic_diagnostics(content, rel_path)
     )
+    source_name = Path(rel_path).name
+    if source_name not in {"package-info.java", "module-info.java"}:
+        expected_type = Path(rel_path).stem
+        declared_types = set(re.findall(
+            r"\b(?:class|interface|enum|record|@interface)\s+([A-Za-z_]\w*)",
+            content,
+        ))
+        if not declared_types:
+            semantic_diagnostics.append(
+                f"Java source {source_name} contains no type declaration; declare {expected_type}"
+            )
+        elif expected_type not in declared_types:
+            semantic_diagnostics.append(
+                f"Java source {source_name} must declare its filename-matching type {expected_type}"
+            )
     if not _JAVAC_PATH:
         return ValidationResult(
             rel_path, "java", "skipped", False,

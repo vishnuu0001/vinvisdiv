@@ -454,6 +454,10 @@ _JAVA_IMPORT_DEPENDENCIES = {
     "lombok.": ("org.projectlombok", "lombok", None),
     "org.mapstruct.": ("org.mapstruct", "mapstruct", "1.6.3"),
     "com.google.protobuf.": ("com.google.protobuf", "protobuf-java", "4.28.3"),
+    "com.google.gson.": ("com.google.code.gson", "gson", "2.11.0"),
+    "org.apache.commons.dbcp2.": ("org.apache.commons", "commons-dbcp2", "2.12.0"),
+    "org.apache.struts.action.": ("org.apache.struts", "struts-core", "1.3.10"),
+    "org.apache.struts.tiles.": ("org.apache.struts", "struts-tiles", "1.3.10"),
     "org.apache.avro.": ("org.apache.avro", "avro", "1.12.0"),
 }
 
@@ -4212,16 +4216,41 @@ _JAVA_KEYWORDS = {
     "throw", "throws", "transient", "try", "void", "volatile", "while",
 }
 
+# Common prose fragments emitted as import symbols by small code models when
+# they mistake nearby English text for a Java type. None can be a generated
+# type name under the project's filename/type conventions.
+_JAVA_INVALID_GENERATED_IMPORT_SYMBOLS = {"from", "in", "not", "to", "used"}
+
 
 def _remove_invalid_java_imports(output: Dict[str, str]) -> None:
     for path, content in list(output.items()):
         if not path.casefold().endswith(".java") or not isinstance(content, str):
             continue
+        package_match = re.search(r"(?m)^\s*package\s+([\w.]+)\s*;", content)
+        declared_type = Path(path).stem
+        self_prefix = (
+            f"{package_match.group(1)}.{declared_type}."
+            if package_match else ""
+        )
         output[path] = re.sub(
             r"(?m)^\s*import\s+([\w.]+)\s*;\s*\r?\n",
-            lambda match: "" if match.group(1).rsplit(".", 1)[-1] in _JAVA_KEYWORDS else match.group(0),
+            lambda match: "" if (
+                match.group(1).rsplit(".", 1)[-1] in _JAVA_KEYWORDS
+                or match.group(1).rsplit(".", 1)[-1] in _JAVA_INVALID_GENERATED_IMPORT_SYMBOLS
+                or (self_prefix and match.group(1).startswith(self_prefix))
+            ) else match.group(0),
             content,
         )
+        # A generated DAO sometimes imports both its legacy domain exception
+        # and JDBC's SQLException under the same simple name. Every catch in
+        # that compilation unit surrounds java.sql calls, so retain JDBC's
+        # checked exception and remove only the proven conflicting legacy one.
+        if "import java.sql.SQLException;" in output[path]:
+            output[path] = re.sub(
+                r"(?m)^\s*import\s+(?!java\.sql\.)[\w.]+\.SQLException\s*;\s*\r?\n",
+                "",
+                output[path],
+            )
 
 
 _SPRING_BOOT3_JAVAX_PACKAGES = {

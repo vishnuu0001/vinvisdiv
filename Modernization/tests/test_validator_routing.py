@@ -22,6 +22,16 @@ from services.validators import (
 
 
 class ValidatorRoutingTests(unittest.TestCase):
+    def test_java_package_only_source_is_rejected(self):
+        result = validate_file(
+            "Mazdausa.java",
+            "package com.example.model;\n",
+            "java",
+        )
+
+        self.assertFalse(result.passed)
+        self.assertTrue(any("contains no type declaration" in item for item in result.diagnostics))
+
     # Function: test_unknown_format_never_passes_as_advisory
     def test_unknown_format_never_passes_as_advisory(self):
         result = validate_file("generated.unknown", "apparently balanced\n", "generic")

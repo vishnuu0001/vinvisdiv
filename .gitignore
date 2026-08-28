@@ -92,6 +92,9 @@ logs/
 Modernization.zip
 Maintenance/.last-published-commit
 Modernization/data/projects/
+# Maven's writable dependency cache is regenerated from pom.xml files. Keep
+# downloaded jars and repository metadata out of source commits/auto-sync.
+Modernization/data/toolchains/maven-repository/
 
 # Stray manual backup of AppRationalization — untracked 2026-07-21 (was a
 # fully tracked duplicate doubling secret/data exposure); kept on disk.
