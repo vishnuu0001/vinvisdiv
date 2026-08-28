@@ -97,6 +97,26 @@ class RunBoundedRoundTests(unittest.TestCase):
 
 
 class RepairBuildRoundHardeningTests(unittest.TestCase):
+    def test_java_repair_cannot_replace_a_class_with_package_only_source(self):
+        path = "Demo/src/main/java/com/example/Demo.java"
+        original = "package com.example; public class Demo {}"
+        output = {path: original}
+
+        with patch(
+            "services.llm.generate",
+            return_value="package com.example;\n",
+        ):
+            failures = _pf_repair_build_round(
+                {path: ["cannot find symbol"]}, 1, 2, output,
+                synthesized_contracts="", namespace_map_text="",
+                llm_model="test-model", system="system prompt",
+                progress=lambda *_args: None, language="java",
+            )
+
+        self.assertIn(path, failures)
+        self.assertIn("contains no type declaration", failures[path])
+        self.assertEqual(original, output[path])
+
     # Function: test_one_hung_repair_call_does_not_block_the_others
     def test_one_hung_repair_call_does_not_block_the_others(self):
         fixable = {
