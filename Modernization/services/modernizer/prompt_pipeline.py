@@ -2426,6 +2426,19 @@ def _pf_repair_build_round(
         cleaned = _clean_generated_content(fixed)
         if not cleaned.strip():
             raise RuntimeError("repair returned empty content")
+        if is_java_file:
+            # A javac diagnostic can move from the rewritten provider to all
+            # of its consumers when a repair silently drops the provider's
+            # type declaration. The build-level rollback below only compares
+            # diagnostics attributed to the rewritten path, so that failure
+            # shape previously looked like an improvement and permanently
+            # replaced a valid class with a package-only file. Validate the
+            # repair itself before it can enter the shared project snapshot.
+            from services.validators import validate_file
+            validation = validate_file(_path, cleaned, "java")
+            if not validation.passed:
+                detail = "; ".join(validation.diagnostics[:5])
+                raise RuntimeError(f"repair failed Java source validation: {detail}")
         return _path, cleaned, time.monotonic() - started
 
     progress(
@@ -3586,6 +3599,19 @@ def _pf_run_build_and_repair(
                     )
             else:
                 build_result = candidate_result
+
+        if lang == "java":
+            # Repair rounds may introduce their final import/dependency or
+            # source-baseline change immediately before convergence/budget
+            # termination. Reconcile once more so the returned output and its
+            # POMs are exactly the tree measured by the final Maven result.
+            before_final_reconcile = dict(output)
+            _reconcile_java_generation_output(output, project_name, target)
+            if output != before_final_reconcile:
+                build_result = run_build(output, lang, _build_tmp)
+                build_result = _pf_attribute_java_frontend_build_errors(
+                    build_result, output,
+                )
 
         _build_status = "passed" if build_result.passed else "still failing"
         progress(

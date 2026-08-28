@@ -458,6 +458,7 @@ _JAVA_IMPORT_DEPENDENCIES = {
     "org.apache.commons.dbcp2.": ("org.apache.commons", "commons-dbcp2", "2.12.0"),
     "org.apache.struts.action.": ("org.apache.struts", "struts-core", "1.3.10"),
     "org.apache.struts.tiles.": ("org.apache.struts", "struts-tiles", "1.3.10"),
+    "org.apache.poi.": ("org.apache.poi", "poi", "5.3.0"),
     "org.apache.avro.": ("org.apache.avro", "avro", "1.12.0"),
 }
 
@@ -4219,7 +4220,7 @@ _JAVA_KEYWORDS = {
 # Common prose fragments emitted as import symbols by small code models when
 # they mistake nearby English text for a Java type. None can be a generated
 # type name under the project's filename/type conventions.
-_JAVA_INVALID_GENERATED_IMPORT_SYMBOLS = {"from", "in", "not", "to", "used"}
+_JAVA_INVALID_GENERATED_IMPORT_SYMBOLS = {"by", "from", "in", "not", "to", "used"}
 
 
 def _remove_invalid_java_imports(output: Dict[str, str]) -> None:

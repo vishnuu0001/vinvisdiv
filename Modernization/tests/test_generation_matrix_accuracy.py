@@ -39,6 +39,7 @@ class GenerationMatrixAccuracyTests(unittest.TestCase):
                 "import org.apache.commons.dbcp2.BasicDataSource;\n"
                 "import org.apache.struts.action.ActionForm;\n"
                 "import org.apache.struts.tiles.TilesRequestProcessor;\n"
+                "import org.apache.poi.ss.usermodel.Sheet;\n"
             )
         })
 
@@ -46,6 +47,7 @@ class GenerationMatrixAccuracyTests(unittest.TestCase):
         self.assertIn(("org.apache.commons", "commons-dbcp2", "2.12.0"), dependencies)
         self.assertIn(("org.apache.struts", "struts-core", "1.3.10"), dependencies)
         self.assertIn(("org.apache.struts", "struts-tiles", "1.3.10"), dependencies)
+        self.assertIn(("org.apache.poi", "poi", "5.3.0"), dependencies)
 
     def test_java_reconciliation_removes_nonexistent_self_member_imports(self):
         path = "Demo/backend/orders/src/main/java/com/example/OrderService.java"
