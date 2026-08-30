@@ -185,6 +185,32 @@ function Invoke-TraceForgeMigrations {
     Write-PublishLog 'TraceForge database migrations applied successfully.'
 }
 
+# Function: Ensure-ModernizationTypeScriptValidator
+function Ensure-ModernizationTypeScriptValidator {
+    $directory = Join-Path $RepoRoot 'Modernization\tools\ts-validate'
+    $compilerPath = Join-Path $directory 'node_modules\typescript\lib\tsc.js'
+    if (Test-Path -LiteralPath $compilerPath -PathType Leaf) { return }
+
+    Write-PublishLog 'Modernization TypeScript validator is missing; restoring locked dependencies.'
+    Push-Location -LiteralPath $directory
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & npm ci --ignore-scripts
+        $ErrorActionPreference = $prevEap
+        if ($LASTEXITCODE -ne 0) {
+            throw "Modernization TypeScript validator restore failed with exit code $LASTEXITCODE"
+        }
+    } finally {
+        $ErrorActionPreference = $prevEap
+        Pop-Location
+    }
+    if (-not (Test-Path -LiteralPath $compilerPath -PathType Leaf)) {
+        throw "Modernization TypeScript validator was not installed at $compilerPath"
+    }
+    Write-PublishLog 'Modernization TypeScript validator restored successfully.'
+}
+
 $frontends = @(
     @{ Prefix = 'AppRationalization/frontend/'; Directory = 'AppRationalization/frontend'; Name = 'AppRationalization' },
     @{ Prefix = 'CodeAnalysis/frontend/'; Directory = 'CodeAnalysis/frontend'; Name = 'CodeAnalysis' },
@@ -228,6 +254,10 @@ if ($PublishAll) {
 
 if (Test-ChangedPath 'Novastra-ITSM/backend/') {
     Sync-NovastraPortalAuthSecret
+}
+
+if ($PublishAll -or (Test-ChangedPath 'Modernization/')) {
+    Ensure-ModernizationTypeScriptValidator
 }
 
 $builtAny = $false

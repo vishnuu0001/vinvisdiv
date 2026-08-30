@@ -96,6 +96,22 @@ function Ensure-NodeModules {
     }
 }
 
+# Function: Ensure-ModernizationTypeScriptValidator
+function Ensure-ModernizationTypeScriptValidator {
+    param([string]$ProjectDir, [switch]$ForceInstall, [switch]$IsDryRun)
+
+    $compilerPath = Join-Path $ProjectDir 'node_modules\typescript\lib\tsc.js'
+    if ($IsDryRun) { return }
+    if ($ForceInstall -or -not (Test-Path -LiteralPath $compilerPath -PathType Leaf)) {
+        Write-Step 'Installing the Modernization TypeScript validator'
+        Invoke-InDirectory -Directory $ProjectDir -ScriptBlock { npm ci --ignore-scripts }
+        if ($LASTEXITCODE -ne 0) { throw "npm ci failed in $ProjectDir" }
+        if (-not (Test-Path -LiteralPath $compilerPath -PathType Leaf)) {
+            throw "Modernization TypeScript validator was not installed at $compilerPath"
+        }
+    }
+}
+
 # Function: Invoke-FrontendBuild
 function Invoke-FrontendBuild {
     param([string]$Label, [string]$Directory, [switch]$IsDryRun)
@@ -250,6 +266,7 @@ $ssdlcBackendDir = Join-Path $repoRoot 'SSDLC_Process_Assessment\backend'
 $ssdlcFrontendDir = Join-Path $repoRoot 'SSDLC_Process_Assessment\frontend'
 $modernizationBackendDir = Join-Path $repoRoot 'Modernization'
 $modernizationFrontendDir = Join-Path $repoRoot 'Modernization\frontend'
+$modernizationTypeScriptValidatorDir = Join-Path $modernizationBackendDir 'tools\ts-validate'
 $labRobotBackendDir = Join-Path $repoRoot 'LabRobot\backend'
 $labRobotFrontendDir = Join-Path $repoRoot 'LabRobot\frontend'
 $otBackendDir = Join-Path $repoRoot 'OpportunityTracker\backend'
@@ -319,6 +336,7 @@ $scmAgentPython = Ensure-PythonEnv -ProjectDir $scmAgentDir -ForceInstall:$Insta
 foreach ($frontend in @($appRatFrontendDir, $infraFrontendDir, $codeFrontendDir, $kgFrontendDir, $dashboardFrontendDir, $ssdlcFrontendDir, $modernizationFrontendDir, $labRobotFrontendDir, $otFrontendDir, $aiRemanFrontendDir, $aiVehicleFrontendDir, $micrositeDir, $scmFrontendDir)) {
     Ensure-NodeModules -ProjectDir $frontend -ForceInstall:$InstallDeps -IsDryRun:$DryRun
 }
+Ensure-ModernizationTypeScriptValidator -ProjectDir $modernizationTypeScriptValidatorDir -ForceInstall:$InstallDeps -IsDryRun:$DryRun
 
 Ensure-Neo4jDesktopDbmsRunning -IsDryRun:$DryRun
 
