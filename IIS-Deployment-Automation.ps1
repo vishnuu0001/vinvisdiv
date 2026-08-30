@@ -720,6 +720,26 @@ function Create-WindowsServices {
 # Phase 6: Frontend Build
 # ============================================================================
 
+# Function: Install-ModernizationTypeScriptValidator
+function Install-ModernizationTypeScriptValidator {
+    $directory = "$DeployPath\Modernization\tools\ts-validate"
+    $compilerPath = Join-Path $directory 'node_modules\typescript\lib\tsc.js'
+    Write-Log "Installing Modernization TypeScript validator"
+    Push-Location -LiteralPath $directory
+    try {
+        npm ci --ignore-scripts
+        if ($LASTEXITCODE -ne 0) {
+            throw "Modernization TypeScript validator restore failed with exit code $LASTEXITCODE"
+        }
+    } finally {
+        Pop-Location
+    }
+    if (-not (Test-Path -LiteralPath $compilerPath -PathType Leaf)) {
+        throw "Modernization TypeScript validator was not installed at $compilerPath"
+    }
+    Write-Log "Modernization TypeScript validator installed successfully" -Level Success
+}
+
 # Function: Build-ReactFrontends
 function Build-ReactFrontends {
     Write-Log "Building React frontends"
@@ -918,6 +938,7 @@ function Main {
         
         Setup-PythonVenvs
         Setup-DotEnvFiles
+        Install-ModernizationTypeScriptValidator
         Create-WindowsServices
         
         Build-ReactFrontends
