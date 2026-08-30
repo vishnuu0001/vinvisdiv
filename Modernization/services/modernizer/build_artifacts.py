@@ -2103,6 +2103,37 @@ def _repair_truncated_java_source_tails(output: Dict[str, str]) -> None:
             output[path] = repaired
         elif missing > 0 and state in {"code", "line-comment"} and content.rstrip().endswith("}"):
             output[path] = content.rstrip() + "\n" + ("}\n" * missing)
+        elif missing > 0 and state in {"code", "line-comment"}:
+            # A recurring large-file truncation leaves a second copy of an
+            # already-complete method declaration at EOF (often after its
+            # Javadoc) without ever opening a body. Removing only that proven
+            # duplicate tail is safer than inventing a body or changing the
+            # earlier, compiler-complete implementation.
+            last_complete_member = content.rfind("}")
+            if last_complete_member < 0:
+                continue
+            prefix = content[:last_complete_member + 1].rstrip()
+            tail = content[last_complete_member + 1:]
+            tail_without_comments = re.sub(r"/\*.*?(?:\*/|$)", "", tail, flags=re.DOTALL)
+            tail_without_comments = re.sub(r"(?m)//.*$", "", tail_without_comments)
+            declaration = re.search(
+                r"(?m)^\s*(?:@[\w.]+(?:\([^)]*\))?\s*)*"
+                r"(?:public|protected|private)\s+(?:static\s+)?(?:final\s+)?"
+                r"(?:<[^>\n]+>\s*)?[\w.$<>\[\], ?]+\s+([A-Za-z_$]\w*)\s*\(",
+                tail_without_comments,
+            )
+            if not declaration:
+                continue
+            method_name = declaration.group(1)
+            completed_names = {
+                match.group(2) for match in _JAVA_METHOD_DECLARATION.finditer(prefix)
+                if _balanced_java_member_end(prefix, match.start()) is not None
+            }
+            if method_name not in completed_names:
+                continue
+            prefix_state, prefix_missing = _java_lexical_tail_state(prefix)
+            if prefix_state == "code" and prefix_missing > 0:
+                output[path] = prefix + "\n" + ("}\n" * prefix_missing)
 
 
 def _reconcile_java_test_subject_contracts(output: Dict[str, str]) -> None:
@@ -4359,6 +4390,11 @@ _SPRING_BOOT3_JAVAX_PACKAGES = {
     "javax.ws.rs": "jakarta.ws.rs",
 }
 
+_JPA_LIFECYCLE_ANNOTATIONS = (
+    "PostLoad", "PostPersist", "PostRemove", "PostUpdate",
+    "PrePersist", "PreRemove", "PreUpdate",
+)
+
 
 def _migrate_spring_boot3_javax_imports(output: Dict[str, str]) -> None:
     """Normalize Java EE imports that were renamed for Spring Boot 3."""
@@ -4375,6 +4411,15 @@ def _migrate_spring_boot3_javax_imports(output: Dict[str, str]) -> None:
             "jakarta.validation.DecimalMin",
             "jakarta.validation.constraints.DecimalMin",
         )
+        # These callbacks are JPA annotations, not Hibernate annotations.
+        # Small code models routinely emit the plausible but nonexistent
+        # org.hibernate.annotations imports, producing deterministic Maven
+        # "cannot find symbol" failures in otherwise valid entity classes.
+        for annotation in _JPA_LIFECYCLE_ANNOTATIONS:
+            content = content.replace(
+                f"import org.hibernate.annotations.{annotation};",
+                f"import jakarta.persistence.{annotation};",
+            )
         output[path] = content
 
 
