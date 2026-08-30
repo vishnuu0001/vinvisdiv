@@ -190,6 +190,9 @@ class GenerationMatrixAccuracyTests(unittest.TestCase):
                 "import org.apache.struts.action.Action;\n"
                 "public class LegacyAction extends Action {}\n"
             ),
+            "Demo/backend/orders/src/main/java/com/example/orders/OrderService.java": (
+                "package com.example.orders; public class OrderService {}\n"
+            ),
         }
 
         _reconcile_java_generation_output(
@@ -228,7 +231,10 @@ class GenerationMatrixAccuracyTests(unittest.TestCase):
             output, "Demo", {"backend_tech": "Java 21 Spring Boot 3"},
         )
 
-        repaired = output[path]
+        repaired = next(
+            content for source_path, content in output.items()
+            if source_path.endswith("/ICLService.java")
+        )
         self.assertIn("*/", repaired)
         self.assertTrue(repaired.rstrip().endswith("}"))
         result = validate_file(path, repaired, "java")
