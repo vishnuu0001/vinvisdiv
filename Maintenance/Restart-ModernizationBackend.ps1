@@ -34,9 +34,11 @@ try {
         } else {
             throw "Port $port is not owned by the expected Python worker; refusing to terminate it."
         }
-        if ($candidate.ExecutablePath) {
+        # Keep the restarted service bound to this checkout. Only reuse the
+        # previous process interpreter when this checkout has no local venv.
+        if (-not $pythonExe -and $candidate.ExecutablePath) {
             $pythonExe = $candidate.ExecutablePath
-        } elseif ($worker.ExecutablePath) {
+        } elseif (-not $pythonExe -and $worker.ExecutablePath) {
             $pythonExe = $worker.ExecutablePath
         }
         Write-Host "Stopping Modernization process tree $($candidate.ProcessId) on port $port."
