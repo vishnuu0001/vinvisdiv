@@ -183,6 +183,57 @@ class GenerationMatrixAccuracyTests(unittest.TestCase):
         report = _java_generation_standards_report(output)
         self.assertTrue(report["passed"], report["diagnostics"])
 
+    def test_java_spring_target_overrides_legacy_struts_evidence_per_module(self):
+        output = {
+            "Demo/backend/legacy-core/src/main/java/com/example/LegacyAction.java": (
+                "package com.example;\n"
+                "import org.apache.struts.action.Action;\n"
+                "public class LegacyAction extends Action {}\n"
+            ),
+        }
+
+        _reconcile_java_generation_output(
+            output,
+            "Demo",
+            {"backend_tech": "Java 21 Spring Boot 3 modernization from Struts"},
+        )
+
+        module = "Demo/backend/legacy-core"
+        self.assertTrue(any(
+            path.startswith(f"{module}/src/main/java/")
+            and "@SpringBootApplication" in content
+            for path, content in output.items() if isinstance(content, str)
+        ))
+        self.assertTrue(any(
+            path.startswith(f"{module}/src/main/java/")
+            and "@RestControllerAdvice" in content
+            for path, content in output.items() if isinstance(content, str)
+        ))
+        self.assertIn(f"{module}/src/main/resources/logback-spring.xml", output)
+        report = _java_generation_standards_report(output)
+        self.assertTrue(report["passed"], report["diagnostics"])
+
+    def test_java_reconciliation_closes_unterminated_tail_comment_before_build(self):
+        path = "Demo/backend/legacy-core/src/main/java/com/example/ICLService.java"
+        output = {
+            path: (
+                "package com.example;\n"
+                "public interface ICLService {\n"
+                "    void load();\n"
+                "    /* generated migration notes ended unexpectedly {\n"
+            ),
+        }
+
+        _reconcile_java_generation_output(
+            output, "Demo", {"backend_tech": "Java 21 Spring Boot 3"},
+        )
+
+        repaired = output[path]
+        self.assertIn("*/", repaired)
+        self.assertTrue(repaired.rstrip().endswith("}"))
+        result = validate_file(path, repaired, "java")
+        self.assertTrue(result.passed, result.diagnostics)
+
     # Function: test_java_standards_reject_foreign_backend_and_console_logging
     def test_java_standards_reject_foreign_backend_and_console_logging(self):
         output = {
@@ -380,6 +431,28 @@ class GenerationMatrixAccuracyTests(unittest.TestCase):
         _reconcile_java_console_logging_calls(output)
         _reconcile_java_console_logging_calls(output)
 
+        self.assertEqual(1, output[path].count("LoggerFactory.getLogger"))
+
+    def test_reconcile_java_logging_replaces_print_stack_trace_with_existing_logger(self):
+        path = "Demo/backend/legacy-core/src/main/java/com/example/Processor.java"
+        output = {path: (
+            "package com.example;\n"
+            "import org.slf4j.Logger;\n"
+            "import org.slf4j.LoggerFactory;\n"
+            "public class Processor {\n"
+            "    private static final Logger LOGGER = LoggerFactory.getLogger(Processor.class);\n"
+            "    void run() {\n"
+            "        try { work(); } catch (Exception exception) {\n"
+            "            exception.printStackTrace();\n"
+            "        }\n"
+            "    }\n"
+            "}\n"
+        )}
+
+        _reconcile_java_console_logging_calls(output)
+
+        self.assertNotIn("printStackTrace", output[path])
+        self.assertIn('LOGGER.error("Unhandled exception", exception);', output[path])
         self.assertEqual(1, output[path].count("LoggerFactory.getLogger"))
 
     # Function: test_normalize_java_output_path_separators_prefers_existing_forward_slash_key

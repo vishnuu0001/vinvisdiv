@@ -1416,6 +1416,13 @@ def _reconcile_postgres_sql_dialect(output: Dict[str, str], target_db: str) -> N
 
 _JAVA_CONSOLE_CALL_RE = re.compile(r"\bSystem\.(out|err)\.(println|print|printf)\s*\(")
 _JAVA_LOGGER_FIELD_RE = re.compile(r"\bLoggerFactory\.getLogger\s*\(")
+_JAVA_LOGGER_FIELD_NAME_RE = re.compile(
+    r"\b(?:Logger|org\.slf4j\.Logger)\s+([A-Za-z_$]\w*)\s*=\s*"
+    r"(?:org\.slf4j\.)?LoggerFactory\.getLogger\s*\("
+)
+_JAVA_PRINT_STACK_TRACE_RE = re.compile(
+    r"(?m)^(?P<indent>[ \t]*)(?P<exception>[A-Za-z_$]\w*)\.printStackTrace\s*\(\s*\)\s*;[ \t]*$"
+)
 _JAVA_CLASS_DECL_RE = re.compile(r"\b(?:class|interface|enum|record)\s+([A-Za-z_]\w*)")
 
 
@@ -1478,10 +1485,14 @@ def _reconcile_java_console_logging_calls(output: Dict[str, str]) -> None:
     for path, content in list(output.items()):
         if not path.casefold().endswith(".java") or "/src/main/java/" not in path.replace("\\", "/"):
             continue
-        if not isinstance(content, str) or not _JAVA_CONSOLE_CALL_RE.search(content):
+        if not isinstance(content, str) or not (
+            _JAVA_CONSOLE_CALL_RE.search(content) or _JAVA_PRINT_STACK_TRACE_RE.search(content)
+        ):
             continue
 
         rewritten = content
+        logger_match = _JAVA_LOGGER_FIELD_NAME_RE.search(rewritten)
+        logger_name = logger_match.group(1) if logger_match else "log"
         while True:
             match = _JAVA_CONSOLE_CALL_RE.search(rewritten)
             if not match:
@@ -1495,8 +1506,16 @@ def _reconcile_java_console_logging_calls(output: Dict[str, str]) -> None:
             stream, method = match.group(1), match.group(2)
             level = "error" if stream == "err" else "info"
             replacement_args = f"String.format({args})" if method == "printf" else args
-            replacement = f"log.{level}({replacement_args})"
+            replacement = f"{logger_name}.{level}({replacement_args})"
             rewritten = rewritten[:match.start()] + replacement + rewritten[args_end + 1:]
+
+        rewritten = _JAVA_PRINT_STACK_TRACE_RE.sub(
+            lambda match: (
+                f'{match.group("indent")}{logger_name}.error('
+                f'"Unhandled exception", {match.group("exception")});'
+            ),
+            rewritten,
+        )
 
         if rewritten == content:
             continue  # every match was unbalanced/unsafe to touch — nothing changed
@@ -1564,6 +1583,7 @@ def _reconcile_java_generation_output(
     """Enforce the canonical Java build boundary and frontend dependency closure."""
     _normalize_java_output_path_separators(output)
     _normalize_java_build_roots(output, project_name)
+    _repair_truncated_java_source_tails(output)
     # Normalize source APIs before inferring Maven dependencies. Otherwise a
     # repair that introduces the canonical JJWT/WebFlux/etc. import leaves the
     # POM one pass behind and guarantees a needless failed build round.
@@ -1576,7 +1596,6 @@ def _reconcile_java_generation_output(
     _reconcile_java_spring_component_stereotypes(output)
     _migrate_java_web_framework_contracts(output, str((target or {}).get("backend_tech") or ""))
     _reconcile_java_typed_exception_catches(output)
-    _repair_truncated_java_source_tails(output)
     _repair_truncated_java_test_tails(output)
     _reconcile_java_test_subject_contracts(output)
     _reconcile_java_request_validation(output)
@@ -2007,18 +2026,82 @@ def _repair_truncated_java_test_tails(output: Dict[str, str]) -> None:
             output[path] = prefix + "\n" + ("}\n" * missing)
 
 
-def _repair_truncated_java_source_tails(output: Dict[str, str]) -> None:
-    """Close main Java files whose generated tail ended after a complete block.
+def _java_lexical_tail_state(content: str) -> tuple[str, int]:
+    """Return the terminal lexical state and structural brace depth for Java."""
+    state = "code"
+    depth = 0
+    index = 0
+    escaped = False
+    while index < len(content):
+        char = content[index]
+        pair = content[index:index + 2]
+        triple = content[index:index + 3]
+        if state == "code":
+            if pair == "//":
+                state = "line-comment"
+                index += 2
+                continue
+            if pair == "/*":
+                state = "block-comment"
+                index += 2
+                continue
+            if triple == '\"\"\"':
+                state = "text-block"
+                index += 3
+                continue
+            if char == '"':
+                state = "string"
+                escaped = False
+            elif char == "'":
+                state = "char"
+                escaped = False
+            elif char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+        elif state == "line-comment":
+            if char in "\r\n":
+                state = "code"
+        elif state == "block-comment":
+            if pair == "*/":
+                state = "code"
+                index += 2
+                continue
+        elif state == "text-block":
+            if triple == '\"\"\"' and (index == 0 or content[index - 1] != "\\"):
+                state = "code"
+                index += 3
+                continue
+        else:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif (state == "string" and char == '"') or (state == "char" and char == "'"):
+                state = "code"
+        index += 1
+    return state, depth
 
-    This deliberately does not guess at partial expressions.  A source ending
-    in ``}`` with a positive brace balance is the safe, recurring case: the
-    final method is complete and only its enclosing type terminator was lost.
+
+def _repair_truncated_java_source_tails(output: Dict[str, str]) -> None:
+    """Close safely recoverable generated Java comments and type terminators.
+
+    An LLM response can end inside a trailing block/Javadoc comment. Java then
+    reports both ``unclosed comment`` and ``reached end of file`` while raw
+    brace counting is misled by braces inside that comment. Lexical scanning
+    closes only that comment and only the already-open structural blocks; it
+    deliberately leaves truncated strings and expressions to compiler repair.
     """
     for path, content in list(output.items()):
         if "/src/main/java/" not in path or not path.casefold().endswith(".java") or not isinstance(content, str):
             continue
-        missing = content.count("{") - content.count("}")
-        if missing > 0 and content.rstrip().endswith("}"):
+        state, missing = _java_lexical_tail_state(content)
+        if state == "block-comment":
+            repaired = content.rstrip() + "\n*/\n"
+            if missing > 0:
+                repaired += "}\n" * missing
+            output[path] = repaired
+        elif missing > 0 and state in {"code", "line-comment"} and content.rstrip().endswith("}"):
             output[path] = content.rstrip() + "\n" + ("}\n" * missing)
 
 
