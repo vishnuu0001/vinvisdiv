@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from services.validators import (
+    _JAVAC_SYNTAX_PATTERNS,
     ValidationResult,
     _validate_cobol,
     _validate_csharp,
@@ -22,6 +23,16 @@ from services.validators import (
 
 
 class ValidatorRoutingTests(unittest.TestCase):
+    def test_java_dangling_try_catch_finally_diagnostics_are_not_filtered_as_noise(self):
+        messages = (
+            "'catch' without 'try'",
+            "'finally' without 'try'",
+            "'try' without 'catch', 'finally' or resource declarations",
+        )
+        for message in messages:
+            with self.subTest(message=message):
+                self.assertTrue(any(pattern.search(message) for pattern in _JAVAC_SYNTAX_PATTERNS))
+
     def test_java_package_only_source_is_rejected(self):
         result = validate_file(
             "Mazdausa.java",

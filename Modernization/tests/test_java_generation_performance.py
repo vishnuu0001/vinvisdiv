@@ -13,6 +13,59 @@ from services.validators import ValidationResult
 
 
 class JavaGenerationEvidenceTests(unittest.TestCase):
+    def test_large_java_conversion_uses_the_complete_source_and_xlarge_output_budget(self):
+        from services.modernizer import conversion_pipeline
+        from services.modernizer._shared import _TOKENS_XLARGE
+
+        source = "package legacy;\npublic class Large {\n" + ("// evidence\n" * 1_300) + "// END-MARKER\n}\n"
+        passed = ValidationResult("Large.java", "java", "compiler", True, [])
+        captured = {}
+
+        def fake_validated(prompt, **kwargs):
+            captured["prompt"] = prompt
+            captured.update(kwargs)
+            return "package modern; public class Large {}\n", passed, 1
+
+        with tempfile.TemporaryDirectory() as temp_dir, patch.object(
+            conversion_pipeline, "_read_conversion_cache", return_value=None,
+        ), patch.object(
+            conversion_pipeline, "_write_conversion_cache",
+        ), patch(
+            "services.modernizer.validation_orchestration._generate_validated",
+            side_effect=fake_validated,
+        ):
+            path = Path(temp_dir) / "Large.java"
+            conversion_pipeline._convert_file_with_llm(
+                path, source, "java",
+                {"id": "spring", "name": "Spring Boot 3", "language": "java"},
+                analysis={}, root_ns="modern", model="test-model", system="system",
+                out_path="ModernizedApp/src/main/java/modern/Large.java",
+            )
+
+        self.assertIn("// END-MARKER", captured["prompt"])
+        self.assertNotIn("convert shown portion only", captured["prompt"])
+        self.assertEqual(_TOKENS_XLARGE, captured["max_tokens"])
+
+    def test_oversized_java_conversion_fails_instead_of_truncating_source(self):
+        from services.modernizer import conversion_pipeline
+
+        source = "package legacy;\npublic class Huge {\n" + ("int value;\n" * 6_500) + "}\n"
+        with tempfile.TemporaryDirectory() as temp_dir, patch.object(
+            conversion_pipeline, "_read_conversion_cache", return_value=None,
+        ), patch(
+            "services.modernizer.validation_orchestration._generate_validated",
+        ) as generate_validated:
+            path = Path(temp_dir) / "Huge.java"
+            with self.assertRaisesRegex(RuntimeError, "refusing to truncate"):
+                conversion_pipeline._convert_file_with_llm(
+                    path, source, "java",
+                    {"id": "spring", "name": "Spring Boot 3", "language": "java"},
+                    analysis={}, root_ns="modern", model="test-model", system="system",
+                    out_path="ModernizedApp/src/main/java/modern/Huge.java",
+                )
+
+        generate_validated.assert_not_called()
+
     def test_spring_boolean_entity_contract_is_normalized_for_service_api(self):
         from services.modernizer.domain_generators.java import _normalize_spring_entity_contract
 

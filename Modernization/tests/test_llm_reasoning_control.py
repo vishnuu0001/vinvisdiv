@@ -1,4 +1,5 @@
 import json
+import time
 import unittest
 from unittest.mock import patch
 
@@ -19,7 +20,19 @@ class _StreamResponse:
         yield json.dumps({"response": "backend/Program.cs", "done": True})
 
 
+class _LengthLimitedStreamResponse(_StreamResponse):
+    def iter_lines(self):
+        yield json.dumps({"response": "public class Demo {", "done": False})
+        yield json.dumps({"response": "", "done": True, "done_reason": "length"})
+
+
 class LlmReasoningControlTests(unittest.TestCase):
+    def test_generate_rejects_an_explicit_token_limit_cutoff(self):
+        with self.assertRaisesRegex(RuntimeError, "truncated at the configured token limit"):
+            llm._read_generation_response(
+                _LengthLimitedStreamResponse(), time.monotonic(), None, None,
+            )
+
     @patch.object(llm, "_httpx")
     def test_generate_disables_reasoning_by_default(self, httpx):
         httpx.stream.return_value = _StreamResponse()

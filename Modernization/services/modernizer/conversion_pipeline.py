@@ -1638,7 +1638,11 @@ def _convert_file_with_llm(
     target_stack = target.get("id", target.get("name", ""))
 
     # ── Content-addressed cache: skip LLM if same source+stack was already converted ──
-    cache_version = "java-validated-v2" if lang == "java" else "v1"
+    # v3 invalidates Java entries produced by the former 12k-character source
+    # truncation path.  Some of those outputs happened to be syntactically
+    # balanced despite omitting the unseen business logic, so syntax validation
+    # alone could have admitted them to the v2 cache indefinitely.
+    cache_version = "java-full-source-v3" if lang == "java" else "v1"
     cached = _read_conversion_cache(src_content, target_stack, src_lang, cache_version)
     if cached:
         return cached, None, 1

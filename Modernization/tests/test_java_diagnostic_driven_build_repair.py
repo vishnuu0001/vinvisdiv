@@ -7,7 +7,7 @@ from services.modernizer.build_artifacts import (
     _reconcile_java_missing_well_known_imports_from_diagnostics,
     _reconcile_java_private_access_from_diagnostics,
 )
-from services.modernizer._shared import _TOKENS_COMPONENT
+from services.modernizer._shared import _TOKENS_COMPONENT, _TOKENS_XLARGE
 from services.modernizer.prompt_pipeline import _pf_repair_build_round, _pf_run_build_and_repair
 
 
@@ -186,7 +186,7 @@ class JavaTruncatedRepairTokenBudgetTests(unittest.TestCase):
             )
         return captured
 
-    def test_truncation_error_gets_the_full_component_budget(self):
+    def test_truncation_error_gets_at_least_the_full_component_budget(self):
         short_truncated_content = "class Foo {\n    void bar() {\n        try {\n"
         captured = self._run(
             [
@@ -196,6 +196,15 @@ class JavaTruncatedRepairTokenBudgetTests(unittest.TestCase):
             short_truncated_content,
         )
         self.assertEqual(captured.get("max_tokens"), _TOKENS_COMPONENT)
+
+    def test_large_truncated_java_file_gets_size_aware_xlarge_budget(self):
+        large_truncated_content = "class Foo {\n" + ("    void method() {}\n" * 1_500)
+        captured = self._run(
+            ["reached end of file while parsing"],
+            large_truncated_content,
+        )
+
+        self.assertEqual(captured.get("max_tokens"), _TOKENS_XLARGE)
 
     def test_non_truncation_error_keeps_the_length_based_formula(self):
         short_content = "class Foo {}"
