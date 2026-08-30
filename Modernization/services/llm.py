@@ -997,6 +997,17 @@ def _read_generation_response(
             # Surface reasoning activity without mixing it into generated code.
             on_token(token or data.get("thinking", ""))
         if data.get("done"):
+            # Ollama reports a normal token-budget cutoff as a successful HTTP
+            # response.  Returning the accumulated prefix here makes callers
+            # indistinguishably treat a truncated source file as a complete
+            # generation; Java then repeatedly surfaces EOF/dangling-try
+            # diagnostics.  A length stop is not a usable artifact, so fail
+            # the call before any caller can persist or cache the prefix.
+            if str(data.get("done_reason") or "").casefold() == "length":
+                raise RuntimeError(
+                    "LLM output was truncated at the configured token limit; "
+                    "no partial artifact was accepted"
+                )
             break
     return "".join(accumulated)
 

@@ -1629,7 +1629,8 @@ def _convert_file_with_llm(
     Returns (content, ValidationResult-or-None, attempts). ValidationResult is None for a cache
     hit — the content was already validated (or predates this feature) on the run that cached it."""
     from ._shared import (
-        _JAVA_FILE_GENERATION_MAX_SECONDS, _SRC_MAX_CHARS, _SRC_TRUNCATE_AT,
+        _CTX_CHARS_PER_TOKEN, _CTX_SAFETY_MARGIN, _JAVA_FILE_GENERATION_MAX_SECONDS,
+        _SRC_MAX_CHARS, _SRC_TRUNCATE_AT, _TOKENS_XLARGE,
         _adaptive_max_tokens, _adaptive_num_ctx,
     )
     from .validation_orchestration import _generate_validated
@@ -1660,10 +1661,20 @@ def _convert_file_with_llm(
         if sibling_files else ""
     )
 
-    # Truncate very large files to avoid context overflow
-    src_snippet = src_content if len(src_content) <= _SRC_MAX_CHARS else (
-        src_content[:_SRC_TRUNCATE_AT] + f"\n... [{len(src_content)-_SRC_TRUNCATE_AT} chars truncated — convert shown portion only]"
-    )
+    # A partial source file cannot produce a production-ready Java conversion.
+    # The old path silently kept only the first 12k characters and explicitly
+    # asked the model to "convert shown portion only".  Large legacy classes
+    # therefore ended at a repeatable token/source boundary and later repair
+    # rounds could only rewrite the same incomplete artifact.  Java receives
+    # the complete source or fails safely below when it cannot fit the model's
+    # supported context; other language services retain their existing policy.
+    if lang == "java":
+        src_snippet = src_content
+    else:
+        src_snippet = src_content if len(src_content) <= _SRC_MAX_CHARS else (
+            src_content[:_SRC_TRUNCATE_AT]
+            + f"\n... [{len(src_content)-_SRC_TRUNCATE_AT} chars truncated — convert shown portion only]"
+        )
 
     prompt_started = time.monotonic()
     prompt = (
@@ -1717,6 +1728,23 @@ def _convert_file_with_llm(
 
     # Adaptive context window: smaller ctx = faster KV-cache setup + generation
     max_out  = _adaptive_max_tokens(src_content, src_lang, lang)
+    if lang == "java" and len(src_content) > _SRC_MAX_CHARS:
+        # Large Java modernization commonly expands imports, annotations, and
+        # typed error handling.  Eight thousand tokens is smaller than several
+        # real legacy inputs, so reserve the full supported large-file budget.
+        max_out = _TOKENS_XLARGE
+        required_tokens = (
+            (len(prompt) + len(system or "")) // _CTX_CHARS_PER_TOKEN
+            + max_out
+            + _CTX_SAFETY_MARGIN
+        )
+        if required_tokens > 32_768:
+            raise RuntimeError(
+                f"Java source {src_path.name} requires approximately "
+                f"{required_tokens:,} context tokens for a complete conversion, "
+                "exceeding the supported 32,768-token window; refusing to "
+                "truncate or emit a partial production artifact"
+            )
     num_ctx  = _adaptive_num_ctx(len(prompt) + len(system or ""), max_out)
     if lang == "java":
         logger.info(

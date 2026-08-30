@@ -798,8 +798,9 @@ _JAVAC_SYNTAX_PATTERNS = [
         r"not a statement",
         r"else without if",
         r"orphaned case",
-        r"try without catch",
-        r"catch without try",
+        r"'?try'? without (?:'?catch'?|'?finally'?|catch, finally)",
+        r"'?catch'? without '?try'?",
+        r"'?finally'? without '?try'?",
     )
 ]
 

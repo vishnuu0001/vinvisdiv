@@ -2285,7 +2285,7 @@ def _pf_repair_build_round(
     import threading
     from concurrent.futures import ThreadPoolExecutor
     from ._shared import (
-        _REPAIR_CALL_MAX_SECONDS, _TOKENS_COMPONENT, _adaptive_num_ctx,
+        _REPAIR_CALL_MAX_SECONDS, _TOKENS_COMPONENT, _TOKENS_XLARGE, _adaptive_num_ctx,
         _round_budget_seconds, _run_bounded_round,
     )
     from .validation_orchestration import _clean_generated_content
@@ -2404,9 +2404,15 @@ def _pf_repair_build_round(
             # reproduces the identical cutoff every round, which is exactly
             # why these errors previously survived every repair attempt
             # instead of ever converging. Give a truncated file the full
-            # component budget instead of a fraction of its own incomplete
-            # length.
-            repair_tokens = _TOKENS_COMPONENT
+            # large-file budget instead of a fraction of its own incomplete
+            # length.  Six thousand tokens was still too small for the large
+            # legacy Java units that triggered this path, so size from the
+            # current artifact with headroom and cap at the supported 12k
+            # generation ceiling.
+            repair_tokens = min(
+                _TOKENS_XLARGE,
+                max(_TOKENS_COMPONENT, len(current_content) // 3 + 1_536),
+            )
         _repair_num_ctx = _adaptive_num_ctx(
             len(_repair_prompt) + len(system), repair_tokens,
         )
