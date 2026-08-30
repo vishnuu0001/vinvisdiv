@@ -568,13 +568,26 @@ _JAVA_VECTOR_BASE_STORES = {
 
 
 def _java_framework_key(backend_tech: str, output: Optional[Dict[str, str]] = None) -> str:
-    evidence = " ".join((
-        backend_tech or "",
-        " ".join(
-            content for path, content in (output or {}).items()
-            if path.casefold().endswith(("pom.xml", ".java")) and isinstance(content, str)
-        ),
-    )).casefold()
+    explicit = (backend_tech or "").casefold()
+    # The selected target is authoritative. Legacy inputs commonly retain
+    # Struts/Java EE imports while being modernized *to* Spring Boot; allowing
+    # those source signals to override the target suppresses Spring's launcher,
+    # exception-advice, and logging baseline for the affected Maven module.
+    if "quarkus" in explicit:
+        return "quarkus"
+    if "micronaut" in explicit:
+        return "micronaut"
+    if "spring" in explicit:
+        return "spring"
+    if any(token in explicit for token in ("jakarta ee", "java ee", "struts", "jakarta.platform")):
+        return "jakarta"
+    if "java se" in explicit:
+        return "java-se"
+
+    evidence = " ".join(
+        content for path, content in (output or {}).items()
+        if path.casefold().endswith(("pom.xml", ".java")) and isinstance(content, str)
+    ).casefold()
     if "quarkus" in evidence:
         return "quarkus"
     if "micronaut" in evidence:
