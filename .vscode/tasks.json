@@ -4,7 +4,7 @@
 		{
 			"label": "build-modernization-frontend",
 			"type": "shell",
-			"command": "Set-Location 'e:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization\\frontend'; npm.cmd run build",
+			"command": "Set-Location 'E:\\vindivvis\\DVV_StratIQ\\Modernization\\frontend'; npm.cmd run build",
 			"isBackground": false,
 			"problemMatcher": [
 				"$tsc"
@@ -14,7 +14,7 @@
 		{
 			"label": "build-modernization-frontend",
 			"type": "shell",
-			"command": "Set-Location 'e:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization\\frontend'; npm.cmd run build",
+			"command": "Set-Location 'E:\\vindivvis\\DVV_StratIQ\\Modernization\\frontend'; npm.cmd run build",
 			"isBackground": false,
 			"problemMatcher": [
 				"$tsc"
@@ -24,7 +24,7 @@
 		{
 			"label": "start-modernization-watchdog",
 			"type": "shell",
-			"command": "Set-Location 'e:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization'; powershell.exe -NoProfile -ExecutionPolicy Bypass -File '.\\watchdog_backend.ps1'",
+			"command": "Set-Location 'E:\\vindivvis\\DVV_StratIQ\\Modernization'; powershell.exe -NoProfile -ExecutionPolicy Bypass -File '.\\watchdog_backend.ps1'",
 			"isBackground": true,
 			"problemMatcher": [],
 			"group": "build"
@@ -719,7 +719,7 @@
 			"command": "cmd.exe",
 			"args": [
 				"/c",
-				"cd /d E:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization && .venv\\Scripts\\python.exe -m pip install --upgrade pip && .venv\\Scripts\\python.exe -m pip install -r requirements.txt pytest"
+				"cd /d E:\\vindivvis\\DVV_StratIQ\\Modernization && .venv\\Scripts\\python.exe -m pip install --upgrade pip && .venv\\Scripts\\python.exe -m pip install -r requirements.txt pytest"
 			],
 			"isBackground": false,
 			"group": "build"
@@ -730,7 +730,7 @@
 			"command": "cmd.exe",
 			"args": [
 				"/c",
-				"cd /d E:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization\\frontend && npm install"
+				"cd /d E:\\vindivvis\\DVV_StratIQ\\Modernization\\frontend && npm install"
 			],
 			"isBackground": false,
 			"group": "build"
@@ -741,7 +741,7 @@
 			"command": "cmd.exe",
 			"args": [
 				"/c",
-				"cd /d E:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization\\tools\\ts-validate && npm install"
+				"cd /d E:\\vindivvis\\DVV_StratIQ\\Modernization\\tools\\ts-validate && npm install"
 			],
 			"isBackground": false,
 			"group": "build"
@@ -752,7 +752,7 @@
 			"command": "cmd.exe",
 			"args": [
 				"/c",
-				"cd /d E:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization\\frontend && npm run build"
+				"cd /d E:\\vindivvis\\DVV_StratIQ\\Modernization\\frontend && npm run build"
 			],
 			"isBackground": false,
 			"group": "build"
@@ -763,7 +763,7 @@
 			"command": "cmd.exe",
 			"args": [
 				"/c",
-				"cd /d E:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization && .venv\\Scripts\\python.exe -m pytest tests -q"
+				"cd /d E:\\vindivvis\\DVV_StratIQ\\Modernization && .venv\\Scripts\\python.exe -m pytest tests -q"
 			],
 			"isBackground": false,
 			"group": "test"
@@ -774,7 +774,7 @@
 			"command": "cmd.exe",
 			"args": [
 				"/c",
-				"cd /d E:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization && .venv\\Scripts\\python.exe -m pytest tests -q"
+				"cd /d E:\\vindivvis\\DVV_StratIQ\\Modernization && .venv\\Scripts\\python.exe -m pytest tests -q"
 			],
 			"isBackground": false,
 			"group": "test"
@@ -785,7 +785,7 @@
 			"command": "cmd.exe",
 			"args": [
 				"/c",
-				"cd /d E:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization && .venv\\Scripts\\python.exe -c \"import json; from services.build_runner import toolchain_status; s=toolchain_status(); open('tmp_toolchain_status_runtime.json','w',encoding='utf-8').write(json.dumps(s, indent=2)); print('written', len(s.get('catalog', [])))\""
+				"cd /d E:\\vindivvis\\DVV_StratIQ\\Modernization && .venv\\Scripts\\python.exe -c \"import json; from services.build_runner import toolchain_status; s=toolchain_status(); open('tmp_toolchain_status_runtime.json','w',encoding='utf-8').write(json.dumps(s, indent=2)); print('written', len(s.get('catalog', [])))\""
 			],
 			"isBackground": false,
 			"group": "build"
@@ -796,7 +796,7 @@
 			"command": "cmd.exe",
 			"args": [
 				"/c",
-				"cd /d E:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization && .venv\\Scripts\\python.exe tmp_runtime_probe.py"
+				"cd /d E:\\vindivvis\\DVV_StratIQ\\Modernization && .venv\\Scripts\\python.exe tmp_runtime_probe.py"
 			],
 			"isBackground": false,
 			"group": "test"
@@ -818,7 +818,7 @@
 			"command": "cmd.exe",
 			"args": [
 				"/c",
-				"cd /d E:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization && .venv\\Scripts\\python.exe -m compileall api services"
+				"cd /d E:\\vindivvis\\DVV_StratIQ\\Modernization && .venv\\Scripts\\python.exe -m compileall api services"
 			],
 			"isBackground": false,
 			"group": "build"
@@ -829,7 +829,7 @@
 			"command": "cmd.exe",
 			"args": [
 				"/c",
-				"cd /d E:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization && .venv\\Scripts\\python.exe -c \"import json; from services.build_runner import toolchain_status; s=toolchain_status(); miss=[i['id'] for i in s.get('catalog',[]) if not i.get('installed')]; print(json.dumps(miss))\""
+				"cd /d E:\\vindivvis\\DVV_StratIQ\\Modernization && .venv\\Scripts\\python.exe -c \"import json; from services.build_runner import toolchain_status; s=toolchain_status(); miss=[i['id'] for i in s.get('catalog',[]) if not i.get('installed')]; print(json.dumps(miss))\""
 			],
 			"isBackground": false,
 			"group": "build"
@@ -840,7 +840,7 @@
 			"command": "cmd.exe",
 			"args": [
 				"/c",
-				"cd /d E:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization && .venv\\Scripts\\python.exe tmp_phase2_toolchain_install.py"
+				"cd /d E:\\vindivvis\\DVV_StratIQ\\Modernization && .venv\\Scripts\\python.exe tmp_phase2_toolchain_install.py"
 			],
 			"isBackground": false,
 			"group": "build"
@@ -851,7 +851,7 @@
 			"command": "cmd.exe",
 			"args": [
 				"/c",
-				"cd /d E:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization && .venv\\Scripts\\python.exe tmp_phase2_toolchain_install.py && echo __PHASE2_DONE__"
+				"cd /d E:\\vindivvis\\DVV_StratIQ\\Modernization && .venv\\Scripts\\python.exe tmp_phase2_toolchain_install.py && echo __PHASE2_DONE__"
 			],
 			"isBackground": false,
 			"group": "build"
@@ -896,7 +896,7 @@
 			"command": "cmd.exe",
 			"args": [
 				"/c",
-				"cd /d E:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization && .venv\\Scripts\\python.exe tmp_phase2_toolchain_install.py"
+				"cd /d E:\\vindivvis\\DVV_StratIQ\\Modernization && .venv\\Scripts\\python.exe tmp_phase2_toolchain_install.py"
 			],
 			"isBackground": false,
 			"group": "build"
@@ -1171,7 +1171,7 @@
 			"command": "cmd.exe",
 			"args": [
 				"/c",
-				"cd /d e:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization && python tmp_phase2_toolchain_install.py"
+				"cd /d E:\\vindivvis\\DVV_StratIQ\\Modernization && python tmp_phase2_toolchain_install.py"
 			],
 			"isBackground": false,
 			"group": "build"
@@ -1182,7 +1182,7 @@
 			"command": "cmd.exe",
 			"args": [
 				"/c",
-				"cd /d e:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization && if exist .venv\\Scripts\\python.exe (.venv\\Scripts\\python.exe tmp_phase2_toolchain_install.py) else (python tmp_phase2_toolchain_install.py)"
+				"cd /d E:\\vindivvis\\DVV_StratIQ\\Modernization && if exist .venv\\Scripts\\python.exe (.venv\\Scripts\\python.exe tmp_phase2_toolchain_install.py) else (python tmp_phase2_toolchain_install.py)"
 			],
 			"isBackground": false,
 			"group": "build"
@@ -1193,7 +1193,7 @@
 			"command": "cmd.exe",
 			"args": [
 				"/c",
-				"cd /d e:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization && .venv\\Scripts\\python.exe tmp_phase2_toolchain_install.py > phase2_rerun.log 2>&1"
+				"cd /d E:\\vindivvis\\DVV_StratIQ\\Modernization && .venv\\Scripts\\python.exe tmp_phase2_toolchain_install.py > phase2_rerun.log 2>&1"
 			],
 			"isBackground": false,
 			"group": "build"
@@ -1204,7 +1204,7 @@
 			"command": "cmd.exe",
 			"args": [
 				"/c",
-				"for %f in (e:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization\\toolchain_phase2_report.json e:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization\\ALL_STACKS_AVAILABILITY_REPORT.md e:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization\\phase2_rerun.log) do @echo %~nxf %~tf %~zf"
+				"for %f in (E:\\vindivvis\\DVV_StratIQ\\Modernization\\toolchain_phase2_report.json E:\\vindivvis\\DVV_StratIQ\\Modernization\\ALL_STACKS_AVAILABILITY_REPORT.md E:\\vindivvis\\DVV_StratIQ\\Modernization\\phase2_rerun.log) do @echo %~nxf %~tf %~zf"
 			],
 			"isBackground": false,
 			"group": "build"
@@ -1215,7 +1215,7 @@
 			"command": "cmd.exe",
 			"args": [
 				"/c",
-				"cd /d e:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization && .venv\\Scripts\\python.exe tmp_phase2_toolchain_install.py"
+				"cd /d E:\\vindivvis\\DVV_StratIQ\\Modernization && .venv\\Scripts\\python.exe tmp_phase2_toolchain_install.py"
 			],
 			"isBackground": false,
 			"group": "build"
@@ -1226,7 +1226,7 @@
 			"command": "cmd.exe",
 			"args": [
 				"/c",
-				"for %f in (e:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization\\toolchain_phase2_report.json e:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization\\ALL_STACKS_AVAILABILITY_REPORT.md) do @echo %~nxf %~tf %~zf"
+				"for %f in (E:\\vindivvis\\DVV_StratIQ\\Modernization\\toolchain_phase2_report.json E:\\vindivvis\\DVV_StratIQ\\Modernization\\ALL_STACKS_AVAILABILITY_REPORT.md) do @echo %~nxf %~tf %~zf"
 			],
 			"isBackground": false,
 			"group": "build"
@@ -1261,7 +1261,7 @@
 			"args": [
 				"-NoProfile",
 				"-Command",
-				"Get-Item 'e:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization\\toolchain_phase2_report.json','e:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization\\ALL_STACKS_AVAILABILITY_REPORT.md' | Select-Object Name,LastWriteTime,Length"
+				"Get-Item 'E:\\vindivvis\\DVV_StratIQ\\Modernization\\toolchain_phase2_report.json','E:\\vindivvis\\DVV_StratIQ\\Modernization\\ALL_STACKS_AVAILABILITY_REPORT.md' | Select-Object Name,LastWriteTime,Length"
 			],
 			"isBackground": false,
 			"group": "build"
@@ -1272,7 +1272,7 @@
 			"command": "cmd.exe",
 			"args": [
 				"/c",
-				"cd /d e:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization && .venv\\Scripts\\python.exe tmp_phase2_finalize_report.py"
+				"cd /d E:\\vindivvis\\DVV_StratIQ\\Modernization && .venv\\Scripts\\python.exe tmp_phase2_finalize_report.py"
 			],
 			"isBackground": false,
 			"group": "build"
@@ -1309,7 +1309,7 @@
 			"command": "cmd.exe",
 			"args": [
 				"/c",
-				"cd /d E:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization && .venv\\Scripts\\python.exe -m pytest tests/test_build_runner_integrity.py::BuildRunnerIntegrityTests::test_npm_compile_uses_dedicated_frontend_build_timeout -vv --maxfail=1"
+				"cd /d E:\\vindivvis\\DVV_StratIQ\\Modernization && .venv\\Scripts\\python.exe -m pytest tests/test_build_runner_integrity.py::BuildRunnerIntegrityTests::test_npm_compile_uses_dedicated_frontend_build_timeout -vv --maxfail=1"
 			],
 			"isBackground": false,
 			"group": "build"
@@ -1411,7 +1411,7 @@
 			"command": "cmd.exe",
 			"args": [
 				"/c",
-				"cd /d E:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization && .venv\\Scripts\\python.exe -c \"import asyncio; from services.build_runner import toolchain_status; from api.server import target_stacks; s=toolchain_status(); print('flutter_ready=', s['tools']['flutter']['ready']); print('flutter_path=', s['tools']['flutter']['path']); by={x['id']:x for x in asyncio.run(target_stacks())['stacks']}; keys=['flutter_dotnet','dart_server','swift_vapor','jenkins_pipeline','github_actions_workflow']; [print(k, by[k]['available'], by[k]['project_ready'], by[k]['full_generation'], by[k]['blocked_reason']) for k in keys]\""
+				"cd /d E:\\vindivvis\\DVV_StratIQ\\Modernization && .venv\\Scripts\\python.exe -c \"import asyncio; from services.build_runner import toolchain_status; from api.server import target_stacks; s=toolchain_status(); print('flutter_ready=', s['tools']['flutter']['ready']); print('flutter_path=', s['tools']['flutter']['path']); by={x['id']:x for x in asyncio.run(target_stacks())['stacks']}; keys=['flutter_dotnet','dart_server','swift_vapor','jenkins_pipeline','github_actions_workflow']; [print(k, by[k]['available'], by[k]['project_ready'], by[k]['full_generation'], by[k]['blocked_reason']) for k in keys]\""
 			],
 			"isBackground": false,
 			"group": "build"
@@ -1422,7 +1422,7 @@
 			"command": "cmd.exe",
 			"args": [
 				"/c",
-				"cd /d E:\\stratIQ_VA-main\\stratIQ_VA-main\\Modernization && .venv\\Scripts\\python.exe tmp_verify_target_prereqs_final.py"
+				"cd /d E:\\vindivvis\\DVV_StratIQ\\Modernization && .venv\\Scripts\\python.exe tmp_verify_target_prereqs_final.py"
 			],
 			"isBackground": false,
 			"group": "build"
