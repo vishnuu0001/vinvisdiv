@@ -698,6 +698,10 @@ def modernize_project(
             target=target,
         )
         if standards_report is not None:
+            # Reconciliation/build repair can add or restore the per-module
+            # launcher, exception advice, and logback baseline.  Persist the
+            # report for the exact final tree, not the stale pre-repair tree.
+            standards_report = _java_generation_standards_report(output)
             output["ModernizedApp/JAVA_GENERATION_STANDARDS.json"] = json.dumps(
                 standards_report, indent=2,
             ) + "\n"

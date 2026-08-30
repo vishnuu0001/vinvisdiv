@@ -183,6 +183,42 @@ class GenerationMatrixAccuracyTests(unittest.TestCase):
         report = _java_generation_standards_report(output)
         self.assertTrue(report["passed"], report["diagnostics"])
 
+    def test_mixed_spring_and_legacy_evidence_still_gets_every_module_baseline(self):
+        modules = ("auth-service", "customer-service", "legacy-core", "mazdausa-service")
+        output = {}
+        for module in modules:
+            prefix = f"Demo/backend/{module}"
+            output[f"{prefix}/src/main/java/com/example/{module.replace('-', '')}/LegacyAction.java"] = (
+                f"package com.example.{module.replace('-', '')};\n"
+                "import org.apache.struts.action.Action;\n"
+                "import org.springframework.stereotype.Service;\n"
+                "@Service public class LegacyAction extends Action {}\n"
+            )
+            # Reproduce a pre-existing but incomplete logging file: presence
+            # alone must not suppress the production baseline.
+            output[f"{prefix}/src/main/resources/logback-spring.xml"] = (
+                "<configuration><appender name=\"CONSOLE\"/></configuration>\n"
+            )
+
+        _reconcile_java_generation_output(
+            output, "Demo", {"backend_tech": "", "db_target": "postgres"},
+        )
+
+        for module in modules:
+            prefix = f"Demo/backend/{module}"
+            module_java = [
+                content for path, content in output.items()
+                if path.startswith(f"{prefix}/src/main/java/") and path.endswith(".java")
+            ]
+            self.assertTrue(any("@SpringBootApplication" in content for content in module_java))
+            self.assertTrue(any("@RestControllerAdvice" in content for content in module_java))
+            logback = output[f"{prefix}/src/main/resources/logback-spring.xml"]
+            self.assertIn("RollingFileAppender", logback)
+            self.assertIn("application.json.log", logback)
+
+        report = _java_generation_standards_report(output)
+        self.assertTrue(report["passed"], report["diagnostics"])
+
     def test_java_spring_target_overrides_legacy_struts_evidence_per_module(self):
         output = {
             "Demo/backend/legacy-core/src/main/java/com/example/LegacyAction.java": (

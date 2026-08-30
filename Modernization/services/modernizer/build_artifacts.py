@@ -592,6 +592,15 @@ def _java_framework_key(backend_tech: str, output: Optional[Dict[str, str]] = No
         return "quarkus"
     if "micronaut" in evidence:
         return "micronaut"
+    # A modernized module can legitimately retain legacy Struts/Java EE
+    # references while already containing Spring controllers or a Spring Boot
+    # POM.  Positive target-framework evidence must win over source-history
+    # evidence; the previous order classified such mixed modules as Jakarta
+    # and skipped their launcher, exception advice, and logging baseline.
+    if any(token in evidence for token in (
+        "spring-boot-starter", "org.springframework", "@springbootapplication",
+    )):
+        return "spring"
     if any(token in evidence for token in ("jakarta ee", "java ee", "struts", "jakarta.platform")):
         return "jakarta"
     if "java se" in evidence and "spring" not in evidence:
@@ -1027,21 +1036,31 @@ def _ensure_java_operational_baseline(
 ) -> None:
     """Add exception management and durable structured logging to a Spring module."""
     prefix = source_root.rstrip("/") + "/"
-    has_advice = any(
+    has_compliant_advice = any(
         path.startswith(prefix) and path.endswith(".java")
-        and isinstance(content, str) and "@RestControllerAdvice" in content
+        and isinstance(content, str)
+        and "@RestControllerAdvice" in content
+        and "@ExceptionHandler(Exception.class)" in content
+        and "ProblemDetail" in content
+        and "LoggerFactory.getLogger" in content
+        and re.search(r"\blog\.error\s*\([^;]*exception\s*\)", content, re.DOTALL)
         for path, content in output.items()
     )
     package_name = _java_common_package(output, source_root, application_name)
-    if not has_advice:
+    if not has_compliant_advice:
         handler_path = (
             f"{prefix}{package_name.replace('.', '/')}/error/GlobalExceptionHandler.java"
         )
         output[handler_path] = _java_exception_handler(package_name)
-    output.setdefault(
-        f"{resources_root.rstrip('/')}/logback-spring.xml",
-        _java_logback_configuration(application_name),
-    )
+    logback_path = f"{resources_root.rstrip('/')}/logback-spring.xml"
+    existing_logback = output.get(logback_path, "")
+    if not (
+        isinstance(existing_logback, str)
+        and "RollingFileAppender" in existing_logback
+        and "application.json.log" in existing_logback
+        and "CONSOLE" in existing_logback
+    ):
+        output[logback_path] = _java_logback_configuration(application_name)
 
 
 def _java_reactor_pom(project_name: str, modules: List[str], java_version: str) -> str:
