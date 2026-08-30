@@ -2920,7 +2920,8 @@ def _prune_unreferenced_java_mappers(output: Dict[str, str]) -> None:
 
 _JAVA_METHOD_DECLARATION = re.compile(
     r"(?m)^[ \t]*(?:public|protected|private)\s+(?:static\s+)?(?:final\s+)?"
-    r"([A-Za-z_][\w<>?,.\[\] ]*)\s+([A-Za-z_]\w*)\s*\(([^)]*)\)\s*\{"
+    r"([A-Za-z_][\w<>?,.\[\] ]*)\s+([A-Za-z_]\w*)\s*\(([^)]*)\)"
+    r"(?:\s+throws\s+[A-Za-z_$][\w.$]*(?:\s*,\s*[A-Za-z_$][\w.$]*)*)?\s*\{"
 )
 
 
