@@ -285,13 +285,18 @@ internal sealed class WorkspaceForm : Form
 
     private void ShowRuntimeError()
     {
-        _webView.NavigateToString("""
-            <!doctype html><html><body style="margin:0;background:#181818;color:#fff;font:16px Segoe UI;padding:52px">
-            <h1>Microsoft Edge WebView2 Runtime is required</h1>
-            <p style="color:#aaa;max-width:680px;line-height:1.6">Install the Evergreen WebView2 Runtime, then reopen Lab Robot Windows App.</p>
-            <a style="color:#55aaff" href="https://developer.microsoft.com/microsoft-edge/webview2/">Open the official WebView2 download page</a>
-            </body></html>
-            """);
+        _webView.Visible = false;
+        var message = new Label
+        {
+            Dock = DockStyle.Fill,
+            Padding = new Padding(48),
+            BackColor = Shell,
+            ForeColor = Color.White,
+            Font = new Font("Segoe UI", 13F),
+            Text = "Microsoft Edge WebView2 Runtime is required.\n\nInstall the Evergreen Runtime, then reopen Lab Robot Windows App.\n\nhttps://developer.microsoft.com/microsoft-edge/webview2/",
+        };
+        _webView.Parent?.Controls.Add(message);
+        message.BringToFront();
     }
 
     private string BuildHomeHtml()
@@ -309,7 +314,7 @@ internal sealed class WorkspaceForm : Form
               <span class="meta"><strong>{card.Name}</strong><em>{card.Vendor}</em><small>Launch in workspace&nbsp; ↗</small></span>
             </button>
             """));
-        return $$"""
+        return $$$"""
             <!doctype html>
             <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
             <style>
@@ -325,7 +330,7 @@ internal sealed class WorkspaceForm : Form
             </style></head><body><main>
               <p class="eyebrow">Strat-Aqorynth AI Workspaces</p><h1>Apps</h1>
               <p class="intro">Open AI studios and Lab Robot operations in one native Windows workspace.</p>
-              <section class="grid">{{cardHtml}}</section>
+              <section class="grid">{{{cardHtml}}}</section>
             </main><script>function openApp(target){window.chrome.webview.postMessage({type:'navigate',target});}</script></body></html>
             """;
     }

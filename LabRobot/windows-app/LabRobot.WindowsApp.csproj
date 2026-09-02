@@ -6,6 +6,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <!-- The WebView2 package carries an unused WPF facade alongside its
+         WinForms control. SDK 10 reports that facade's WindowsBase reference
+         even though this application never loads it. -->
+    <NoWarn>$(NoWarn);MSB3277</NoWarn>
     <AssemblyName>LabRobot.WindowsApp</AssemblyName>
     <RootNamespace>LabRobot.WindowsApp</RootNamespace>
   </PropertyGroup>

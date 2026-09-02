@@ -1,5 +1,3 @@
-using System.Web;
-
 namespace LabRobot.WindowsApp;
 
 internal static class Program
@@ -45,9 +43,21 @@ internal sealed record WorkspaceOptions(
             initialTarget = requested.Equals("lab-robot", StringComparison.OrdinalIgnoreCase)
                 ? "lab"
                 : targets.ContainsKey(requested) ? requested : "home";
-            token = HttpUtility.ParseQueryString(launchUri.Query).Get("token");
+            token = QueryValue(launchUri, "token");
         }
 
         return new WorkspaceOptions(initialTarget, token, targets);
+    }
+
+    private static string? QueryValue(Uri uri, string key)
+    {
+        foreach (var pair in uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var separator = pair.IndexOf('=');
+            var name = separator >= 0 ? pair[..separator] : pair;
+            if (!Uri.UnescapeDataString(name).Equals(key, StringComparison.OrdinalIgnoreCase)) continue;
+            return separator >= 0 ? Uri.UnescapeDataString(pair[(separator + 1)..]) : string.Empty;
+        }
+        return null;
     }
 }
