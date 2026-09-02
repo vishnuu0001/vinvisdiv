@@ -213,6 +213,11 @@ const GROUP_DETAILS = {
 // Function: withAuthHash
 const withAuthHash = (url, token) => (token ? `${url}#authToken=${encodeURIComponent(token)}` : url);
 
+const labRobotDesktopUri = (token) => {
+  const query = token ? `?token=${encodeURIComponent(token)}` : '';
+  return `stratiq-labrobot://open/lab-robot${query}`;
+};
+
 // Function: LaunchModulesPage
 const LaunchModulesPage = () => {
   const navigate = useNavigate();
@@ -262,6 +267,10 @@ const LaunchModulesPage = () => {
   // Function: openModule
   const openModule = (app) => {
     if (!hasAccess(app.key)) return;
+    if (app.key === 'LAB_ROBOT' && process.env.REACT_APP_LAB_ROBOT_DESKTOP_ENABLED !== 'false') {
+      window.location.assign(labRobotDesktopUri(token));
+      return;
+    }
     window.location.assign(withAuthHash(app.url(), token));
   };
 
