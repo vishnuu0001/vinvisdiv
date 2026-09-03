@@ -46,6 +46,7 @@ const HIDDEN_MODULE_KEYS = new Set([
   'OPPORTUNITY_TRACKER',
 ]);
 const LAUNCHER_MODULES = MODULES.filter((module) => !HIDDEN_MODULE_KEYS.has(module.key));
+const LAUNCHER_GROUPS = GROUP_ORDER.filter((group) => LAUNCHER_MODULES.some((module) => module.group === group));
 
 const withAuthHash = (url, token) => {
   if (!token) return url;
@@ -95,7 +96,7 @@ const LaunchModulesPage = () => {
     });
   }, [applications, query, category, favoritesOnly, favorites]);
 
-  const groupedModules = useMemo(() => GROUP_ORDER
+  const groupedModules = useMemo(() => LAUNCHER_GROUPS
     .map((group) => ({ group, apps: filteredApplications.filter((app) => app.group === group) }))
     .filter(({ apps }) => apps.length), [filteredApplications]);
 
@@ -193,7 +194,7 @@ const LaunchModulesPage = () => {
 
             <div className="launcher-toolbar">
               <div className="launcher-filter-row">
-                {['All', ...GROUP_ORDER].map((item) => <button key={item} type="button" className={category === item ? 'selected' : ''} onClick={() => setCategory(item)}>{item}</button>)}
+                {['All', ...LAUNCHER_GROUPS].map((item) => <button key={item} type="button" className={category === item ? 'selected' : ''} onClick={() => setCategory(item)}>{item}</button>)}
               </div>
               <span className="launcher-result-count">{filteredApplications.length} applications</span>
               <div className="launcher-view-toggle">
