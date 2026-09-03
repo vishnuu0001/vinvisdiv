@@ -35,6 +35,18 @@ const MODULES = [
 
 const GROUP_ORDER = ['Portfolio & Analysis', 'Modernization & AI', 'Operations', 'ATM Pipeline'];
 
+// These modules remain available for direct access, but are intentionally not
+// advertised in the unified launcher.
+const HIDDEN_MODULE_KEYS = new Set([
+  'MICROSITE_DATA_ANALYSIS',
+  'AI_REMAN_CORE',
+  'SSDLC_PROCESS_ASSESSMENT',
+  'LAB_ROBOT',
+  'AI_VEHICLE_LOAN',
+  'OPPORTUNITY_TRACKER',
+]);
+const LAUNCHER_MODULES = MODULES.filter((module) => !HIDDEN_MODULE_KEYS.has(module.key));
+
 const withAuthHash = (url, token) => {
   if (!token) return url;
   const cleanUrl = url.split('#')[0];
@@ -45,7 +57,7 @@ const LaunchModulesPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, token, hasAccess, logout } = useAuth();
-  const [applications, setApplications] = useState(MODULES);
+  const [applications, setApplications] = useState(LAUNCHER_MODULES);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All');
   const [view, setView] = useState('grid');
@@ -66,9 +78,9 @@ const LaunchModulesPage = () => {
   const loadApplications = useCallback(() => fetchApplications()
     .then((response) => {
       const appKeys = new Set((response?.applications || []).map((app) => app.key));
-      setApplications(MODULES.filter((module) => appKeys.has(module.key)));
+      setApplications(LAUNCHER_MODULES.filter((module) => appKeys.has(module.key)));
     })
-    .catch(() => setApplications(MODULES)), []);
+    .catch(() => setApplications(LAUNCHER_MODULES)), []);
 
   useEffect(() => { loadApplications(); }, [loadApplications]);
   useEffect(() => { if (requestedKey && !activeApp) navigate('/launch-modules', { replace: true }); }, [requestedKey, activeApp, navigate]);
