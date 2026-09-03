@@ -137,7 +137,7 @@ const LaunchModulesPage = () => {
         <button type="button" className="launcher-avatar" title={`${user?.username || 'Account'} · Sign out`} onClick={onLogout}>{initials}</button>
       </header>
 
-      <div className={`launcher-layout ${railOpen ? '' : 'rail-collapsed'}`}>
+      <div className={`launcher-layout ${railOpen ? '' : 'rail-collapsed'} ${activeApp ? 'module-open' : ''}`}>
         <aside className="launcher-rail">
           <button type="button" className="launcher-rail-toggle" onClick={() => setRailOpen((open) => !open)} aria-label={railOpen ? 'Collapse navigation' : 'Expand navigation'}>
             {railOpen ? <PanelLeftClose size={19} /> : <PanelLeftOpen size={19} />}
