@@ -80,7 +80,7 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="az-shell flex items-center justify-center px-4 py-6 sm:px-6 lg:px-8">
+    <div className="az-shell login-shell flex items-center justify-center px-4 py-6 sm:px-6 lg:px-8">
       <div className="relative z-10 grid w-full max-w-[1460px] gap-6 xl:grid-cols-[1.12fr_0.88fr]">
         <section className="az-hero flex min-h-[420px] flex-col justify-center overflow-hidden sm:p-8 lg:p-9">
           <div className="flex flex-wrap gap-2">
