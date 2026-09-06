@@ -49,9 +49,17 @@ const LAUNCHER_MODULES = MODULES.filter((module) => !HIDDEN_MODULE_KEYS.has(modu
 const LAUNCHER_GROUPS = GROUP_ORDER.filter((group) => LAUNCHER_MODULES.some((module) => module.group === group));
 
 const withAuthHash = (url, token) => {
-  if (!token) return url;
-  const cleanUrl = url.split('#')[0];
-  return `${cleanUrl}#authToken=${encodeURIComponent(token)}`;
+  const resolvedUrl = new URL(url, window.location.origin);
+
+  // Browsers block HTTP iframes inside the HTTPS production portal. Module
+  // settings can be supplied at build time as absolute URLs, so normalize
+  // every target here instead of relying on each deployment value being safe.
+  if (window.location.protocol === 'https:' && resolvedUrl.protocol === 'http:') {
+    resolvedUrl.protocol = 'https:';
+  }
+
+  resolvedUrl.hash = token ? `authToken=${encodeURIComponent(token)}` : '';
+  return resolvedUrl.toString();
 };
 
 const LaunchModulesPage = () => {

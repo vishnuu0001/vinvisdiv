@@ -750,7 +750,7 @@ function Build-ReactFrontends {
                REACT_APP_API_URL                          = "http://localhost/api"
                REACT_APP_CODE_ANALYSIS_URL                = "/ca/"
                REACT_APP_INFRA_SCAN_URL                   = "/infra/"
-               REACT_APP_DASHBOARD_URL                    = "/dash"
+               REACT_APP_DASHBOARD_URL                    = "/dash/"
                REACT_APP_INTUNE_AUTOMATION_URL            = "/intune/"
                REACT_APP_NOVASTRA_ITSM_URL        = "/novastra-itsm/ticket-analysis"
                REACT_APP_TOOL_ANALYSIS_QUALIFICATION_URL  = "/tools/"
