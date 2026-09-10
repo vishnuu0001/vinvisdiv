@@ -38,14 +38,10 @@
 ::-webkit-scrollbar-thumb { @apply bg-white/10 rounded-full; }
 ::-webkit-scrollbar-thumb:hover { @apply bg-white/20; }
 
-/* Right-frame content area: compact font scale to match sidebar */
+/* Right-frame content area: readable application scale */
 .ki-content {
-  font-size: 13px;
-  line-height: 1.4;
-}
-/* Preserve explicit pixel sizes and larger display numbers inside ki-content */
-.ki-content [class*="text-["] {
-  font-size: inherit;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 /* Prose styles for markdown answers */
@@ -78,11 +74,10 @@
 .answer-prose-dark blockquote { @apply border-l-4 border-brand-500 pl-3 italic text-gray-600 my-2; }
 .answer-prose-dark strong { @apply font-semibold text-gray-900; }
 
-/* Support Chat uses the requested compact Office typography throughout. */
+/* Support Chat follows the same readable typography as the other modules. */
 .support-chat-window,
 .support-chat-window *:not(svg):not(path) {
   font-family: Aptos, "Segoe UI", Arial, sans-serif !important;
-  font-size: 10px !important;
 }
 
 /* Unified light shell overrides */
@@ -219,10 +214,10 @@ body,
   --az-canvas: #f3f2f1;
   --az-panel: #ffffff;
   --az-nav: #f8f8f8;
-  --az-border: #d2d0ce;
-  --az-border-soft: #edebe9;
-  --az-text: #242424;
-  --az-text-secondary: #605e5c;
+  --az-border: #aeb8c4;
+  --az-border-soft: #cbd5e1;
+  --az-text: #172033;
+  --az-text-secondary: #46556a;
   --az-success: #107c10;
   --az-danger: #a4262c;
 }
@@ -356,6 +351,8 @@ body,
   background: var(--az-canvas);
   color: var(--az-text);
   font-family: "Segoe UI", SegoeUI, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .novastra-itsm-content > * { min-width: 0; }
@@ -414,7 +411,7 @@ body,
 .novastra-itsm-content .btn-secondary,
 .novastra-itsm-content .btn-danger { border-radius: 2px !important; }
 
-.novastra-itsm-content .card { border-color: var(--az-border-soft); box-shadow: 0 1px 2px rgb(0 0 0 / 8%); }
+.novastra-itsm-content .card { border-color: var(--az-border-soft); box-shadow: 0 2px 6px rgb(15 23 42 / 10%); }
 .novastra-itsm-content input:not([type='checkbox']):not([type='radio']),
 .novastra-itsm-content select,
 .novastra-itsm-content textarea {
@@ -423,6 +420,8 @@ body,
   border-radius: 2px !important;
   background: #fff !important;
   color: var(--az-text) !important;
+  font-size: 13.5px !important;
+  font-weight: 450;
   box-shadow: none !important;
 }
 .novastra-itsm-content input:focus,
@@ -443,9 +442,158 @@ body,
 .novastra-itsm-content .btn-secondary:hover { background: #f3f2f1; }
 .novastra-itsm-content table { border-collapse: collapse; background: #fff; color: var(--az-text); }
 .novastra-itsm-content thead { background: #f3f2f1 !important; }
-.novastra-itsm-content th { color: #323130 !important; font-size: 12px; font-weight: 600; text-align: left; }
+.novastra-itsm-content th { color: #172033 !important; font-size: 12.5px; font-weight: 700; text-align: left; }
 .novastra-itsm-content th,
 .novastra-itsm-content td { border-color: var(--az-border-soft) !important; }
+
+/* --------------------------------------------------------------------------
+   High-contrast child-module layer
+   Legacy pages were authored for dark surfaces using 9–11px type and pale
+   semantic colors. These rules make every routed module readable on the shared
+   light canvas without requiring each feature page to duplicate accessibility
+   fixes.
+---------------------------------------------------------------------------- */
+.novastra-itsm-content [class*='text-[9px]'],
+.novastra-itsm-content [class*='text-[10px]'] {
+  font-size: 12px !important;
+  line-height: 1.45 !important;
+}
+
+.novastra-itsm-content [class*='text-[11px]'] {
+  font-size: 12.5px !important;
+  line-height: 1.45 !important;
+}
+
+.novastra-itsm-content .text-xs { font-size: 12.5px !important; line-height: 1.45 !important; }
+.novastra-itsm-content .text-sm { font-size: 14px !important; line-height: 1.5 !important; }
+
+.novastra-itsm-content label,
+.novastra-itsm-content legend {
+  color: #334155 !important;
+  font-weight: 600;
+}
+
+.novastra-itsm-content .text-gray-600,
+.novastra-itsm-content .text-slate-600,
+.novastra-itsm-content .text-gray-500,
+.novastra-itsm-content .text-slate-500,
+.novastra-itsm-content .text-gray-400,
+.novastra-itsm-content .text-slate-400,
+.novastra-itsm-content .text-gray-300,
+.novastra-itsm-content .text-slate-300 {
+  color: #46556a !important;
+}
+
+.novastra-itsm-content .text-blue-100,
+.novastra-itsm-content .text-blue-200,
+.novastra-itsm-content .text-blue-300,
+.novastra-itsm-content .text-blue-400,
+.novastra-itsm-content .text-blue-500,
+.novastra-itsm-content .text-cyan-200,
+.novastra-itsm-content .text-cyan-300,
+.novastra-itsm-content .text-cyan-400,
+.novastra-itsm-content .text-teal-400 { color: #075985 !important; }
+
+.novastra-itsm-content .text-green-300,
+.novastra-itsm-content .text-green-400,
+.novastra-itsm-content .text-green-500,
+.novastra-itsm-content .text-emerald-100,
+.novastra-itsm-content .text-emerald-300,
+.novastra-itsm-content .text-emerald-400,
+.novastra-itsm-content .text-emerald-500 { color: #067647 !important; }
+
+.novastra-itsm-content .text-yellow-300,
+.novastra-itsm-content .text-yellow-400,
+.novastra-itsm-content .text-yellow-500,
+.novastra-itsm-content .text-amber-100,
+.novastra-itsm-content .text-amber-300,
+.novastra-itsm-content .text-amber-400,
+.novastra-itsm-content .text-amber-500,
+.novastra-itsm-content .text-orange-300,
+.novastra-itsm-content .text-orange-400 { color: #854d0e !important; }
+
+.novastra-itsm-content .text-red-100,
+.novastra-itsm-content .text-red-200,
+.novastra-itsm-content .text-red-300,
+.novastra-itsm-content .text-red-400,
+.novastra-itsm-content .text-red-500 { color: #b42318 !important; }
+
+.novastra-itsm-content .text-purple-300,
+.novastra-itsm-content .text-purple-400,
+.novastra-itsm-content .text-violet-100,
+.novastra-itsm-content .text-violet-300,
+.novastra-itsm-content .text-violet-400 { color: #6d28d9 !important; }
+
+.novastra-itsm-content [class*='bg-red-'][class*='text-white'],
+.novastra-itsm-content [class*='bg-orange-'][class*='text-white'],
+.novastra-itsm-content [class*='bg-amber-'][class*='text-white'],
+.novastra-itsm-content [class*='bg-yellow-'][class*='text-white'],
+.novastra-itsm-content [class*='bg-green-'][class*='text-white'],
+.novastra-itsm-content [class*='bg-emerald-'][class*='text-white'],
+.novastra-itsm-content [class*='bg-teal-'][class*='text-white'],
+.novastra-itsm-content [class*='bg-cyan-'][class*='text-white'],
+.novastra-itsm-content [class*='bg-purple-'][class*='text-white'],
+.novastra-itsm-content [class*='bg-violet-'][class*='text-white'] { color: #fff !important; }
+
+.novastra-itsm-content section[class*='border'],
+.novastra-itsm-content article[class*='border'],
+.novastra-itsm-content div[class*='border'][class*='bg-white'] {
+  border-color: var(--az-border-soft) !important;
+  box-shadow: 0 2px 7px rgb(15 23 42 / 8%);
+}
+
+.novastra-itsm-content [class*='bg-blue-500/10'],
+.novastra-itsm-content [class*='bg-blue-500/20'],
+.novastra-itsm-content [class*='bg-blue-600/10'],
+.novastra-itsm-content [class*='bg-blue-600/20'],
+.novastra-itsm-content [class*='bg-cyan-500/10'],
+.novastra-itsm-content [class*='bg-cyan-500/15'] { background-color: #e0f2fe !important; }
+
+.novastra-itsm-content [class*='bg-green-500/10'],
+.novastra-itsm-content [class*='bg-green-500/20'],
+.novastra-itsm-content [class*='bg-emerald-500/10'],
+.novastra-itsm-content [class*='bg-emerald-500/15'],
+.novastra-itsm-content [class*='bg-emerald-500/20'] { background-color: #dcfce7 !important; }
+
+.novastra-itsm-content [class*='bg-yellow-500/10'],
+.novastra-itsm-content [class*='bg-yellow-500/20'],
+.novastra-itsm-content [class*='bg-amber-500/10'],
+.novastra-itsm-content [class*='bg-amber-500/15'],
+.novastra-itsm-content [class*='bg-orange-500/10'],
+.novastra-itsm-content [class*='bg-orange-500/20'] { background-color: #fef3c7 !important; }
+
+.novastra-itsm-content [class*='bg-red-400/10'],
+.novastra-itsm-content [class*='bg-red-500/10'],
+.novastra-itsm-content [class*='bg-red-500/15'],
+.novastra-itsm-content [class*='bg-red-500/20'] { background-color: #fee2e2 !important; }
+
+.novastra-itsm-content [class*='bg-violet-500/10'],
+.novastra-itsm-content [class*='bg-violet-500/15'],
+.novastra-itsm-content [class*='bg-violet-500/20'] { background-color: #ede9fe !important; }
+
+.novastra-itsm-content button {
+  min-height: 32px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.novastra-itsm-content button:disabled {
+  opacity: 1 !important;
+  border-color: #9ca3af !important;
+  background: #e5e7eb !important;
+  color: #4b5563 !important;
+  cursor: not-allowed;
+}
+
+.novastra-itsm-content tbody td {
+  color: #334155;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.novastra-itsm-content tbody tr:hover { background-color: #f1f5f9 !important; }
+.novastra-itsm-content input::placeholder,
+.novastra-itsm-content textarea::placeholder { color: #64748b !important; }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: #c8c6c4; border-radius: 0; }
