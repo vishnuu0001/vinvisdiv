@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -226,6 +227,46 @@ async def _auth_kwargs(
     return {"auth": (username, password)}, {}
 
 
+# Function: _session_auth_headers
+async def _session_auth_headers(
+    client: httpx.AsyncClient,
+    base_url: str,
+    username: str,
+    password: str,
+) -> dict[str, str] | None:
+    """Establish ServiceNow browser-session auth for PDIs with Basic disabled.
+
+    ServiceNow accepts the same login.do credentials used by the browser, but
+    cookie-authenticated REST requests additionally require the session's g_ck
+    value in X-UserToken. Return None when login does not produce that token so
+    callers can preserve the original upstream 401.
+    """
+    try:
+        response = await client.post(
+            f"{base_url.rstrip('/')}/login.do",
+            data={
+                "user_name": username,
+                "user_password": password,
+                "sys_action": "sysverb_login",
+            },
+            follow_redirects=True,
+        )
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
+        logger.warning("ServiceNow session-login fallback failed: %s", exc)
+        return None
+
+    for pattern in (
+        r"var\s+g_ck\s*=\s*['\"]([^'\"]+)",
+        r"NOW\.user_token\s*=\s*['\"]([^'\"]+)",
+    ):
+        match = re.search(pattern, response.text or "")
+        if match:
+            return {"X-UserToken": match.group(1)}
+    logger.warning("ServiceNow session-login fallback returned no g_ck user token")
+    return None
+
+
 # Function: test_connection
 async def test_connection(
     base_url: str,
@@ -259,6 +300,16 @@ async def test_connection(
                 headers={"Accept": "application/json", **extra_headers},
                 **auth_kwargs,
             )
+            if response.status_code == 401 and not (client_id and client_secret):
+                session_headers = await _session_auth_headers(
+                    client, base_url, username, password
+                )
+                if session_headers:
+                    response = await client.get(
+                        url,
+                        params=params,
+                        headers={"Accept": "application/json", **session_headers},
+                    )
     except httpx.ConnectError as exc:
         return {
             "ok": False,
@@ -346,6 +397,7 @@ async def _fetch_servicenow_pages(
     verify_ssl: bool = True,
 ) -> list[dict]:
     use_oauth = bool(client_id and client_secret)
+    use_session = False
     auth_kwargs: dict = {}
     extra_headers: dict = {}
     if use_oauth:
@@ -385,6 +437,19 @@ async def _fetch_servicenow_pages(
                 response = await client.get(
                     url, params=params, headers={"Accept": "application/json", **extra_headers}
                 )
+            elif not use_oauth and not use_session and response.status_code == 401:
+                session_headers = await _session_auth_headers(
+                    client, base_url, username, password
+                )
+                if session_headers:
+                    use_session = True
+                    auth_kwargs = {}
+                    extra_headers = session_headers
+                    response = await client.get(
+                        url,
+                        params=params,
+                        headers={"Accept": "application/json", **extra_headers},
+                    )
         except httpx.ConnectError as exc:
             raise ValueError(f"Could not reach ServiceNow instance. Verify base URL/network. Details: {exc}")
         except httpx.TimeoutException as exc:
