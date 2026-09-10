@@ -22,6 +22,11 @@ import {
 import { connect, syncData, disconnect, getConfig } from '../api'
 import { useDashboard } from '../context/DashboardContext'
 
+const DEMO_SERVICENOW_CONNECTION = Object.freeze({
+  url: 'https://dev274740.service-now.com',
+  username: 'admin',
+})
+
 // Function: extractApiError
 function extractApiError(err, fallback) {
   const detail = err?.response?.data?.detail
@@ -87,8 +92,8 @@ function HeaderCard({ connected, connectionExpiresAt }) {
 
 // Function: ConnectionForm
 function ConnectionForm({
-  provider, setProvider, authType, setAuthType, url, setUrl, user, setUser,
-  password, setPassword, showPassword, setShowPassword,
+  provider, setProvider, authType, setAuthType, url, user,
+  password, setPassword, passwordEncrypted, showPassword, setShowPassword,
   connecting, syncing, connected, handleConnect, handleDisconnect,
 }) {
   let connectButtonLabel = 'Connect'
@@ -135,7 +140,7 @@ function ConnectionForm({
             id="conn-instance-url"
             type="text"
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            readOnly
             placeholder="https://your-instance.service-now.com"
             className="az-field"
           />
@@ -150,7 +155,7 @@ function ConnectionForm({
           <input
             type="text"
             value={user}
-            onChange={(e) => setUser(e.target.value)}
+            readOnly
             placeholder={provider === 'JIRA' ? 'you@company.com' : 'admin'}
             className="az-field"
           />
@@ -158,7 +163,7 @@ function ConnectionForm({
 
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-            {authType === 'basic' ? 'Password / API Token' : 'OAuth2 Token'}
+            {passwordEncrypted ? 'Encrypted Password / API Token' : (authType === 'basic' ? 'Password / API Token' : 'OAuth2 Token')}
           </label>
           <div className="relative">
             <input
@@ -292,9 +297,10 @@ export default function ConnectionPanel() {
 
   const [provider, setProvider] = useState('ServiceNow')
   const [authType, setAuthType] = useState('basic')
-  const [url, setUrl] = useState('')
-  const [user, setUser] = useState('')
+  const [url, setUrl] = useState(DEMO_SERVICENOW_CONNECTION.url)
+  const [user, setUser] = useState(DEMO_SERVICENOW_CONNECTION.username)
   const [password, setPassword] = useState('')
+  const [passwordEncrypted, setPasswordEncrypted] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -303,18 +309,31 @@ export default function ConnectionPanel() {
   useEffect(() => {
     getConfig()
       .then((res) => {
-        const { url: cfgUrl, username: cfgUser, password: cfgPwd } = res.data
-        if (cfgUrl) setUrl(cfgUrl)
-        if (cfgUser) setUser(cfgUser)
-        if (cfgPwd) setPassword(cfgPwd)
+        const { encrypted_password: encryptedPassword } = res.data
+        setUrl(DEMO_SERVICENOW_CONNECTION.url)
+        setUser(DEMO_SERVICENOW_CONNECTION.username)
+        if (encryptedPassword) {
+          setPassword(encryptedPassword)
+          setPasswordEncrypted(true)
+        }
       })
       .catch(() => {})
   }, [])
 
   useEffect(() => {
-    if (instanceUrl) setUrl(instanceUrl)
-    if (username) setUser(username)
+    setUrl(DEMO_SERVICENOW_CONNECTION.url)
+    setUser(DEMO_SERVICENOW_CONNECTION.username)
   }, [instanceUrl, username])
+
+  function buildCredentials() {
+    return {
+      url: DEMO_SERVICENOW_CONNECTION.url,
+      username: DEMO_SERVICENOW_CONNECTION.username,
+      password: passwordEncrypted ? '' : password,
+      encrypted_password: passwordEncrypted ? password : undefined,
+      verify_ssl: false,
+    }
+  }
 
   const statusColor = connected ? '#107c10' : '#a4262c'
   const statusBg = connected
@@ -333,13 +352,13 @@ export default function ConnectionPanel() {
     setSuccess('')
     setConnecting(true)
     try {
-      await connect({ url: url.trim(), username: user.trim(), password, verify_ssl: false })
+      await connect(buildCredentials())
       await refreshStatus()
       // Auto-sync immediately after connecting so dashboard data is ready
       setSyncing(true)
       setSyncProgress('Connected — loading data from ServiceNow...')
       try {
-        const res = await syncData({ url: url.trim(), username: user.trim(), password, verify_ssl: false })
+        const res = await syncData(buildCredentials())
         const data = res.data
         if (data.record_counts) setRecordCounts(data.record_counts)
         setSynced(true)
@@ -396,11 +415,13 @@ export default function ConnectionPanel() {
             authType={authType}
             setAuthType={setAuthType}
             url={url}
-            setUrl={setUrl}
             user={user}
-            setUser={setUser}
             password={password}
-            setPassword={setPassword}
+            setPassword={(value) => {
+              setPassword(value)
+              setPasswordEncrypted(false)
+            }}
+            passwordEncrypted={passwordEncrypted}
             showPassword={showPassword}
             setShowPassword={setShowPassword}
             connecting={connecting}

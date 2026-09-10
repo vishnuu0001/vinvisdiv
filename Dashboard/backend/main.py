@@ -36,6 +36,7 @@ from auth import DASHBOARD_APP, auth_required, decode_access_token, extract_bear
 from config import settings
 from data_cache import cache
 from sn_client import ServiceNowClient
+from security.crypto import decrypt_value, encrypt_value
 import settings_store
 import kpis as kpi_engine
 import charts
@@ -455,7 +456,8 @@ async def enforce_auth(request: Request, call_next):
 class ConnectRequest(BaseModel):
     url: str
     username: str
-    password: str
+    password: str = ""
+    encrypted_password: Optional[str] = None
     verify_ssl: bool = True
 
 
@@ -542,6 +544,52 @@ def _get_client(req: Optional[ConnectRequest] = None) -> ServiceNowClient:
     return session_client or ServiceNowClient()
 
 
+# Function: _resolve_connect_request
+def _resolve_connect_request(req: ConnectRequest) -> ConnectRequest:
+    """Decrypt a UI credential envelope without ever returning plaintext to the browser."""
+    password = req.password
+    if req.encrypted_password:
+        try:
+            password = decrypt_value(req.encrypted_password) or ""
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail="The encrypted ServiceNow credential is invalid or expired. Refresh and try again.",
+            ) from exc
+
+    url = req.url.strip()
+    username = req.username.strip()
+    if not url or not username or not password:
+        raise HTTPException(status_code=400, detail="ServiceNow URL, username, and password are required.")
+
+    return ConnectRequest(
+        url=url,
+        username=username,
+        password=password,
+        encrypted_password=None,
+        verify_ssl=req.verify_ssl,
+    )
+
+
+# Function: _public_servicenow_config
+def _public_servicenow_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert the server-side plaintext password into an encrypted UI envelope."""
+    password = str(config.get("password") or "")
+    try:
+        encrypted_password = encrypt_value(password) or ""
+    except RuntimeError as exc:
+        logger.error("ServiceNow credential envelope encryption is unavailable: %s", exc)
+        raise HTTPException(status_code=503, detail="Credential encryption is unavailable.") from exc
+
+    return {
+        "url": str(config.get("url") or ""),
+        "username": str(config.get("username") or ""),
+        "password": "",
+        "encrypted_password": encrypted_password,
+        "verify_ssl": bool(config.get("verify_ssl", True)),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Connection routes
 # ---------------------------------------------------------------------------
@@ -549,20 +597,21 @@ def _get_client(req: Optional[ConnectRequest] = None) -> ServiceNowClient:
 # Function: get_default_config
 @app.get("/api/config")
 def get_default_config() -> Dict[str, Any]:
-    """Return connection settings from the encrypted DB store for UI pre-population."""
+    """Return connection settings with the password encrypted for UI pre-population."""
     try:
-        return settings_store.get_servicenow_config()
+        config = settings_store.get_servicenow_config()
     except Exception as exc:
         # DB unreachable (e.g. POSTGRES_DSN not yet configured with a real password) —
         # fall back to whatever the in-memory settings singleton currently holds
         # (itself already .env-seeded) instead of a raw 500 on every page load.
         logger.warning("Falling back to in-memory ServiceNow config, DB read failed: %s", exc)
-        return {
+        config = {
             "url": settings.SERVICENOW_BASE_URL or "",
             "username": settings.SERVICENOW_USERNAME or "",
             "password": settings.SERVICENOW_PASSWORD or "",
             "verify_ssl": settings.SERVICENOW_VERIFY_SSL,
         }
+    return _public_servicenow_config(config)
 
 
 # Function: get_status
@@ -595,6 +644,7 @@ def get_status() -> Dict[str, Any]:
 @app.post("/api/connect")
 def connect(req: ConnectRequest) -> Dict[str, Any]:
     """Test connectivity to ServiceNow without loading data."""
+    req = _resolve_connect_request(req)
     client = _get_client(req)
     result = client.test_connection()
     if not result.get("success"):
@@ -637,6 +687,8 @@ def sync_data(req: Optional[ConnectRequest] = None) -> Dict[str, Any]:
     Pull all ITSM data from ServiceNow into the in-memory cache.
     Optionally accepts explicit credentials; falls back to .env values.
     """
+    if req is not None:
+        req = _resolve_connect_request(req)
     client = _get_client(req)
 
     # Verify connectivity first

@@ -9,6 +9,11 @@ import { Server, Lock, User, AlertCircle, CheckCircle, Loader } from 'lucide-rea
 import { connect, syncData, getConfig } from '../api'
 import { useDashboard } from '../context/DashboardContext'
 
+const DEMO_SERVICENOW_CONNECTION = Object.freeze({
+  url: 'https://dev274740.service-now.com',
+  username: 'admin',
+})
+
 // Function: extractApiError
 function extractApiError(err, fallback) {
   const detail = err?.response?.data?.detail
@@ -30,9 +35,10 @@ export default function ServiceNowLogin() {
   const navigate = useNavigate()
   const { setConnected, setSynced, setLastSynced, setRecordCounts } = useDashboard()
 
-  const [url, setUrl] = useState('')
-  const [username, setUsername] = useState('')
+  const [url, setUrl] = useState(DEMO_SERVICENOW_CONNECTION.url)
+  const [username, setUsername] = useState(DEMO_SERVICENOW_CONNECTION.username)
   const [password, setPassword] = useState('')
+  const [passwordEncrypted, setPasswordEncrypted] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -41,10 +47,13 @@ export default function ServiceNowLogin() {
   useEffect(() => {
     getConfig()
       .then((res) => {
-        const { url: cfgUrl, username: cfgUser, password: cfgPwd } = res.data
-        if (cfgUrl) setUrl(cfgUrl)
-        if (cfgUser) setUsername(cfgUser)
-        if (cfgPwd) setPassword(cfgPwd)
+        const { encrypted_password: encryptedPassword } = res.data
+        setUrl(DEMO_SERVICENOW_CONNECTION.url)
+        setUsername(DEMO_SERVICENOW_CONNECTION.username)
+        if (encryptedPassword) {
+          setPassword(encryptedPassword)
+          setPasswordEncrypted(true)
+        }
       })
       .catch(() => {})
   }, [])
@@ -62,17 +71,19 @@ export default function ServiceNowLogin() {
     try {
       // Connect to ServiceNow
       await connect({
-        url: url.trim(),
-        username: username.trim(),
-        password,
+        url: DEMO_SERVICENOW_CONNECTION.url,
+        username: DEMO_SERVICENOW_CONNECTION.username,
+        password: passwordEncrypted ? '' : password,
+        encrypted_password: passwordEncrypted ? password : undefined,
         verify_ssl: false,
       })
 
       // Sync data
       const res = await syncData({
-        url: url.trim(),
-        username: username.trim(),
-        password,
+        url: DEMO_SERVICENOW_CONNECTION.url,
+        username: DEMO_SERVICENOW_CONNECTION.username,
+        password: passwordEncrypted ? '' : password,
+        encrypted_password: passwordEncrypted ? password : undefined,
         verify_ssl: false,
       })
 
@@ -125,7 +136,7 @@ export default function ServiceNowLogin() {
             <input
               type="url"
               value={url}
-              onChange={(e) => setUrl(e.target.value)}
+              readOnly
               placeholder="https://dev393867.service-now.com"
               className="w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition-colors"
             />
@@ -140,7 +151,7 @@ export default function ServiceNowLogin() {
             <input
               type="text"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              readOnly
               placeholder="admin"
               className="w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition-colors"
             />
@@ -150,12 +161,15 @@ export default function ServiceNowLogin() {
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-2 flex items-center gap-2">
               <Lock size={14} />
-              Password
+              {passwordEncrypted ? 'Encrypted Password' : 'Password'}
             </label>
             <input
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value)
+                setPasswordEncrypted(false)
+              }}
               placeholder="••••••••"
               className="w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition-colors"
             />
