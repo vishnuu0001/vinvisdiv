@@ -14,10 +14,26 @@ const _backendBase = _apiBase.startsWith('http')
   : ''
 
 const AUTH_TOKEN_KEY = 'token'
+const PORTAL_SESSION_KEY = 'portal_auth_session'
+
+// Function: getSharedPortalToken
+const getSharedPortalToken = () => {
+  try {
+    const session = JSON.parse(sessionStorage.getItem(PORTAL_SESSION_KEY) || 'null')
+    return session?.token || null
+  } catch {
+    return null
+  }
+}
 
 // Function: getPortalToken
 const getPortalToken = () =>
-  sessionStorage.getItem(AUTH_TOKEN_KEY) || localStorage.getItem(AUTH_TOKEN_KEY)
+  // Dashboard is embedded by the same-origin launcher. Prefer its current
+  // authenticated session over legacy `token` keys, which can contain an
+  // expired token from an earlier login and cause every API call to return 401.
+  getSharedPortalToken() ||
+  sessionStorage.getItem(AUTH_TOKEN_KEY) ||
+  localStorage.getItem(AUTH_TOKEN_KEY)
 
 // Function: setPortalToken
 const setPortalToken = (token) => {
