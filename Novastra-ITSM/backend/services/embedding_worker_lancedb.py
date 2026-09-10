@@ -13,11 +13,7 @@ import uuid
 from typing import Any
 
 import backend.config as cfg
-from backend.services.lancedb_store import (
-    delete_incidents as lancedb_delete_incidents,
-    lancedb_enabled,
-    upsert_points as lancedb_upsert_points,
-)
+from backend.services.lancedb_store import lancedb_enabled, upsert_points as lancedb_upsert_points
 
 logger = logging.getLogger(__name__)
 
@@ -164,6 +160,29 @@ def _embed_batch(texts: list[str], embedding_model: Any) -> list[list[float]]:
         raise
 
 
+# Function: _iter_complete_incident_batches
+def _iter_complete_incident_batches(
+    chunks: list[tuple[str, str, dict[str, Any]]],
+    target_size: int,
+):
+    """Yield bounded batches without splitting an incident across writes."""
+    grouped: dict[str, list[tuple[str, str, dict[str, Any]]]] = {}
+    for chunk in chunks:
+        grouped.setdefault(chunk[0], []).append(chunk)
+
+    pending: list[tuple[str, str, dict[str, Any]]] = []
+    for incident_chunks in grouped.values():
+        if pending and len(pending) + len(incident_chunks) > target_size:
+            yield pending
+            pending = []
+        if len(incident_chunks) > target_size:
+            yield incident_chunks
+        else:
+            pending.extend(incident_chunks)
+    if pending:
+        yield pending
+
+
 # Function: index_incidents_to_lancedb
 def index_incidents_to_lancedb(
     records: list[dict],
@@ -234,19 +253,19 @@ def index_incidents_to_lancedb(
     else:
         effective_batch = batch_size
 
-    # Replace affected incidents once, then embed and persist each batch before
-    # moving on. The previous implementation retained every 768-float vector and
-    # a second points copy for the entire sync, which could exceed process memory
-    # for large ServiceNow baselines and terminate the API after indexing.
-    lancedb_delete_incidents([chunk[0] for chunk in chunks])
-    n_batches = (len(chunks) + effective_batch - 1) // effective_batch
+    # Embed and persist complete incident groups before moving on. The previous
+    # implementation retained every 768-float vector and then duplicated them in
+    # a points list, which could exceed process memory for large baselines. Keeping
+    # each incident in one write also preserves replace semantics without deleting
+    # the full existing index up front.
     inserted = 0
-    point_batch_size = 128
-
-    for i in range(0, len(chunks), effective_batch):
-        batch_chunks = chunks[i : i + effective_batch]
+    point_sequence = 0
+    for batch_number, batch_chunks in enumerate(
+        _iter_complete_incident_batches(chunks, effective_batch),
+        start=1,
+    ):
         batch_texts = [chunk[1] for chunk in batch_chunks]
-        logger.debug("Embedding batch %d/%d (%d texts)", i // effective_batch + 1, n_batches, len(batch_texts))
+        logger.debug("Embedding batch %d (%d texts)", batch_number, len(batch_texts))
         batch_vectors = _embed_batch(batch_texts, embedding_model)
         if len(batch_vectors) != len(batch_chunks):
             raise RuntimeError(
@@ -255,16 +274,14 @@ def index_incidents_to_lancedb(
         points = []
         for local_idx, ((ticket_id, _chunk, payload), vector) in enumerate(zip(batch_chunks, batch_vectors)):
             points.append(
-            {
-                "id": _stable_point_id(ticket_id, i + local_idx, source_name),
-                "vector": [float(x) for x in vector],
-                "payload": payload,
-            }
-        )
-        for point_offset in range(0, len(points), point_batch_size):
-            batch_points = points[point_offset : point_offset + point_batch_size]
-            batch_inserted = lancedb_upsert_points(batch_points, delete_existing=False)
-            inserted += batch_inserted
+                {
+                    "id": _stable_point_id(ticket_id, point_sequence + local_idx, source_name),
+                    "vector": [float(x) for x in vector],
+                    "payload": payload,
+                }
+            )
+        inserted += lancedb_upsert_points(points)
+        point_sequence += len(points)
         del batch_vectors, points, batch_chunks, batch_texts
 
     del embedding_model, chunks
