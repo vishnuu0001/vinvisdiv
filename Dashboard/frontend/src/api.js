@@ -26,14 +26,35 @@ const getSharedPortalToken = () => {
   }
 }
 
+// Function: getTokenExpiry
+const getTokenExpiry = (token) => {
+  try {
+    const encoded = token?.split('.')?.[1]
+    if (!encoded) return 0
+    const normalized = encoded.replace(/-/g, '+').replace(/_/g, '/')
+    const payload = JSON.parse(atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')))
+    return Number(payload?.exp || 0)
+  } catch {
+    return 0
+  }
+}
+
 // Function: getPortalToken
-const getPortalToken = () =>
-  // Dashboard is embedded by the same-origin launcher. Prefer its current
-  // authenticated session over legacy `token` keys, which can contain an
-  // expired token from an earlier login and cause every API call to return 401.
-  getSharedPortalToken() ||
-  sessionStorage.getItem(AUTH_TOKEN_KEY) ||
-  localStorage.getItem(AUTH_TOKEN_KEY)
+const getPortalToken = () => {
+  const now = Math.floor(Date.now() / 1000)
+  const candidates = [
+    sessionStorage.getItem(AUTH_TOKEN_KEY),
+    getSharedPortalToken(),
+    localStorage.getItem(AUTH_TOKEN_KEY),
+  ].filter(Boolean)
+
+  // The iframe handoff and shared portal session can briefly contain different
+  // generations of the token. Select the newest token that has not expired.
+  return candidates
+    .map((token) => ({ token, expiresAt: getTokenExpiry(token) }))
+    .filter(({ expiresAt }) => expiresAt > now)
+    .sort((a, b) => b.expiresAt - a.expiresAt)?.[0]?.token || null
+}
 
 // Function: setPortalToken
 const setPortalToken = (token) => {
@@ -78,8 +99,19 @@ client.interceptors.response.use(
   (response) => response,
   async (error) => {
     const status = error?.response?.status
+    const isPortalAuthFailure = status === 401 && Boolean(error?.response?.data?.error)
     const original = error?.config || {}
     const reqUrl = original.url || ''
+
+    if (isPortalAuthFailure && !window.__dashboardAuthRedirecting) {
+      window.__dashboardAuthRedirecting = true
+      sessionStorage.removeItem(AUTH_TOKEN_KEY)
+      sessionStorage.removeItem(PORTAL_SESSION_KEY)
+      localStorage.removeItem(AUTH_TOKEN_KEY)
+      const loginUrl = '/login'
+      if (window.top && window.top !== window.self) window.top.location.assign(loginUrl)
+      else window.location.assign(loginUrl)
+    }
 
     // Some environments proxy /api/* directly to Dashboard backend (8087)
     // without the extra /dashboard segment. If /api/dashboard/* returns 404,
