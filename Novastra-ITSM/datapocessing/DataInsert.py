@@ -21,7 +21,7 @@ import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -79,6 +79,34 @@ class Credentials:
     base_url: str
     username: str
     password: str
+    auth_mode: str = "basic"
+
+
+SCHEMA_FIELDS = {
+    "u_source_number": ("Source Number", "string", 100),
+    "u_number": ("Incident Number", "string", 100),
+    "u_short_description": ("Short Description", "string", 500),
+    "u_description": ("Description", "string", 4000),
+    "u_caller_id": ("Caller", "string", 255),
+    "u_state": ("State", "string", 40),
+    "u_urgency": ("Urgency", "string", 40),
+    "u_impact": ("Impact", "string", 40),
+    "u_priority": ("Priority", "string", 40),
+    "u_opened_at": ("Opened At", "glide_date_time", 0),
+    "u_resolved_at": ("Resolved At", "glide_date_time", 0),
+    "u_closed_at": ("Closed At", "glide_date_time", 0),
+    "u_work_notes": ("Work Notes", "string", 4000),
+    "u_close_notes": ("Resolution Notes", "string", 4000),
+    "u_close_code": ("Resolution Code", "string", 100),
+    "u_source_metadata": ("Source Metadata", "string", 4000),
+    "u_service_offering": ("Service Offering", "string", 255),
+    "u_assignment_group": ("Assignment Group", "string", 255),
+    "u_assigned_to": ("Assigned To", "string", 255),
+    "u_hold_reason": ("On Hold Reason", "string", 255),
+    "u_external_url": ("External URL", "string", 4000),
+    "u_cmdb_ci": ("Configuration Item", "string", 255),
+    "rfc": ("Change Request", "string", 255),
+}
 
 
 def _load_dotenv(path: Path) -> None:
@@ -209,9 +237,12 @@ def _request(client: httpx.Client, method: str, url: str, credentials: Credentia
     response = None
     for attempt in range(1, 6):
         try:
-            response = client.request(
-                method, url, auth=(credentials.username, credentials.password), **kwargs,
+            auth = (
+                (credentials.username, credentials.password)
+                if credentials.auth_mode == "basic"
+                else None
             )
+            response = client.request(method, url, auth=auth, **kwargs)
             if response.status_code not in {429, 500, 502, 503, 504}:
                 break
         except httpx.RequestError:
@@ -219,6 +250,122 @@ def _request(client: httpx.Client, method: str, url: str, credentials: Credentia
                 raise
         time.sleep(min(20, 1.5 ** attempt))
     return response
+
+
+def authenticate_client(client: httpx.Client, credentials: Credentials) -> Credentials:
+    """Use Basic Auth when available, otherwise establish a browser session.
+
+    Some ServiceNow PDIs disable Basic Auth for REST while still allowing the
+    administrator to sign in through login.do. Cookie-authenticated REST calls
+    also require the session's g_ck value in X-UserToken.
+    """
+    probe_url = f"{credentials.base_url}/api/now/table/sys_db_object"
+    probe = client.get(
+        probe_url,
+        params={"sysparm_limit": "1", "sysparm_fields": "name"},
+        auth=(credentials.username, credentials.password),
+        headers={"Accept": JSON_CONTENT_TYPE},
+    )
+    if probe.status_code != 401:
+        probe.raise_for_status()
+        return credentials
+
+    login = client.post(
+        f"{credentials.base_url}/login.do",
+        data={
+            "user_name": credentials.username,
+            "user_password": credentials.password,
+            "sys_action": "sysverb_login",
+        },
+        follow_redirects=True,
+    )
+    login.raise_for_status()
+    token = None
+    for pattern in (
+        r"var\s+g_ck\s*=\s*['\"]([^'\"]+)",
+        r"NOW\.user_token\s*=\s*['\"]([^'\"]+)",
+    ):
+        match = re.search(pattern, login.text)
+        if match:
+            token = match.group(1)
+            break
+    if not token:
+        raise RuntimeError("ServiceNow login succeeded but no session user token was returned.")
+
+    client.headers["X-UserToken"] = token
+    session_credentials = replace(credentials, auth_mode="session")
+    validation = _request(
+        client,
+        "GET",
+        probe_url,
+        session_credentials,
+        params={"sysparm_limit": "1", "sysparm_fields": "name"},
+        headers={"Accept": JSON_CONTENT_TYPE, "X-UserToken": token},
+    )
+    if validation.status_code != 200:
+        raise RuntimeError(
+            f"ServiceNow session authentication failed ({validation.status_code}): "
+            f"{validation.text[:300]}"
+        )
+    return session_credentials
+
+
+def ensure_schema(client: httpx.Client, credentials: Credentials, table: str) -> None:
+    """Idempotently create the custom import table and its required columns."""
+    object_url = f"{credentials.base_url}/api/now/table/sys_db_object"
+    response = _request(client, "GET", object_url, credentials, params={
+        "sysparm_query": f"name={table}",
+        "sysparm_limit": "1",
+        "sysparm_fields": "sys_id,name,label",
+    })
+    response.raise_for_status()
+    if not response.json().get("result"):
+        response = _request(client, "POST", object_url, credentials, params={
+            "sysparm_input_display_value": "true",
+        }, headers=JSON_HEADERS, json={
+            "name": table,
+            "label": "Novastra Imported Incident",
+        })
+        if response.status_code not in {200, 201}:
+            raise RuntimeError(
+                f"Could not create ServiceNow table {table} ({response.status_code}): "
+                f"{response.text[:500]}"
+            )
+        print(f"Created ServiceNow table: {table}")
+
+    dictionary_url = f"{credentials.base_url}/api/now/table/sys_dictionary"
+    for element, (label, internal_type, max_length) in SCHEMA_FIELDS.items():
+        response = _request(client, "GET", dictionary_url, credentials, params={
+            "sysparm_query": f"name={table}^element={element}",
+            "sysparm_limit": "1",
+            "sysparm_fields": "sys_id",
+        })
+        response.raise_for_status()
+        if response.json().get("result"):
+            continue
+        payload = {
+            "name": table,
+            "element": element,
+            "column_label": label,
+            "internal_type": internal_type,
+        }
+        if max_length:
+            payload["max_length"] = str(max_length)
+        response = _request(
+            client,
+            "POST",
+            dictionary_url,
+            credentials,
+            params={"sysparm_input_display_value": "true"},
+            headers=JSON_HEADERS,
+            json=payload,
+        )
+        if response.status_code not in {200, 201}:
+            raise RuntimeError(
+                f"Could not create field {table}.{element} ({response.status_code}): "
+                f"{response.text[:500]}"
+            )
+        print(f"Created field: {element}")
 
 
 def existing_source_numbers(client: httpx.Client, credentials: Credentials, table: str) -> set[str]:
@@ -334,6 +481,8 @@ def main() -> int:
 
     limits = httpx.Limits(max_connections=max(2, args.workers), max_keepalive_connections=max(2, args.workers))
     with httpx.Client(timeout=args.timeout, verify=True, limits=limits) as client:
+        credentials = authenticate_client(client, credentials)
+        ensure_schema(client, credentials, args.table)
         existing = existing_source_numbers(client, credentials, args.table)
         if args.verify_only:
             actual, complete = verify_remote(client, credentials, args.table, len(rows))
