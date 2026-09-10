@@ -420,7 +420,7 @@ body,
   border-radius: 2px !important;
   background: #fff !important;
   color: var(--az-text) !important;
-  font-size: 13.5px !important;
+  font-size: 14px !important;
   font-weight: 450;
   box-shadow: none !important;
 }
@@ -442,7 +442,7 @@ body,
 .novastra-itsm-content .btn-secondary:hover { background: #f3f2f1; }
 .novastra-itsm-content table { border-collapse: collapse; background: #fff; color: var(--az-text); }
 .novastra-itsm-content thead { background: #f3f2f1 !important; }
-.novastra-itsm-content th { color: #172033 !important; font-size: 12.5px; font-weight: 700; text-align: left; }
+.novastra-itsm-content th { color: #172033 !important; font-size: 13px; font-weight: 700; text-align: left; }
 .novastra-itsm-content th,
 .novastra-itsm-content td { border-color: var(--az-border-soft) !important; }
 
@@ -455,16 +455,16 @@ body,
 ---------------------------------------------------------------------------- */
 .novastra-itsm-content [class*='text-[9px]'],
 .novastra-itsm-content [class*='text-[10px]'] {
-  font-size: 12px !important;
-  line-height: 1.45 !important;
-}
-
-.novastra-itsm-content [class*='text-[11px]'] {
   font-size: 12.5px !important;
   line-height: 1.45 !important;
 }
 
-.novastra-itsm-content .text-xs { font-size: 12.5px !important; line-height: 1.45 !important; }
+.novastra-itsm-content [class*='text-[11px]'] {
+  font-size: 13px !important;
+  line-height: 1.45 !important;
+}
+
+.novastra-itsm-content .text-xs { font-size: 13px !important; line-height: 1.45 !important; }
 .novastra-itsm-content .text-sm { font-size: 14px !important; line-height: 1.5 !important; }
 
 .novastra-itsm-content label,
@@ -573,7 +573,7 @@ body,
 
 .novastra-itsm-content button {
   min-height: 32px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -587,7 +587,7 @@ body,
 
 .novastra-itsm-content tbody td {
   color: #334155;
-  font-size: 13px;
+  font-size: 13.5px;
   line-height: 1.45;
 }
 
