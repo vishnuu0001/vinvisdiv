@@ -35,6 +35,7 @@ DEFAULT_WORKBOOK = PROJECT_ROOT / "data" / "Closed incidents until 19April-26.xl
 DEFAULT_CHECKPOINT = Path(__file__).with_name("DataInsert.results.jsonl")
 SOURCE_PREFIX = "NOVASTRA:"
 DEFAULT_TABLE = "u_novastra_imported_incident"
+MAX_IMPORT_ROWS = 1000
 MAX_TEXT = 12000
 JSON_CONTENT_TYPE = "application/json"
 JSON_HEADERS = {"Accept": JSON_CONTENT_TYPE, "Content-Type": JSON_CONTENT_TYPE}
@@ -303,7 +304,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--workers", type=int, default=6)
     parser.add_argument("--table", default=os.getenv("SERVICENOW_TABLE", DEFAULT_TABLE))
     parser.add_argument("--timeout", type=float, default=60)
-    parser.add_argument("--max-rows", type=int, default=0)
+    parser.add_argument(
+        "--max-rows",
+        type=int,
+        default=MAX_IMPORT_ROWS,
+        help=f"Maximum records to process (hard-capped at {MAX_IMPORT_ROWS}).",
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--verify-only", action="store_true")
     parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
@@ -316,8 +322,8 @@ def main() -> int:
     if not args.excel.exists():
         raise FileNotFoundError(args.excel)
     rows = load_rows(args.excel, args.sheet)
-    if args.max_rows > 0:
-        rows = rows[:args.max_rows]
+    requested_rows = args.max_rows if args.max_rows > 0 else MAX_IMPORT_ROWS
+    rows = rows[:min(requested_rows, MAX_IMPORT_ROWS)]
     print(f"Workbook rows: {len(rows)}; target: {credentials.base_url}; credentials: configured")
 
     if args.dry_run:
