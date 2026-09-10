@@ -6,13 +6,18 @@
 """GPU-accelerated embedding worker for LanceDB vector store."""
 from __future__ import annotations
 
+import gc
 import logging
 import re
 import uuid
 from typing import Any
 
 import backend.config as cfg
-from backend.services.lancedb_store import lancedb_enabled, upsert_points as lancedb_upsert_points
+from backend.services.lancedb_store import (
+    delete_incidents as lancedb_delete_incidents,
+    lancedb_enabled,
+    upsert_points as lancedb_upsert_points,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -229,37 +234,41 @@ def index_incidents_to_lancedb(
     else:
         effective_batch = batch_size
 
-    # Embed in batches
-    all_vectors: list[list[float]] = []
-    chunk_texts = [c[1] for c in chunks]
-    n_batches = (len(chunk_texts) + effective_batch - 1) // effective_batch
+    # Replace affected incidents once, then embed and persist each batch before
+    # moving on. The previous implementation retained every 768-float vector and
+    # a second points copy for the entire sync, which could exceed process memory
+    # for large ServiceNow baselines and terminate the API after indexing.
+    lancedb_delete_incidents([chunk[0] for chunk in chunks])
+    n_batches = (len(chunks) + effective_batch - 1) // effective_batch
+    inserted = 0
+    point_batch_size = 128
 
-    for i in range(0, len(chunk_texts), effective_batch):
-        batch_texts = chunk_texts[i : i + effective_batch]
+    for i in range(0, len(chunks), effective_batch):
+        batch_chunks = chunks[i : i + effective_batch]
+        batch_texts = [chunk[1] for chunk in batch_chunks]
         logger.debug("Embedding batch %d/%d (%d texts)", i // effective_batch + 1, n_batches, len(batch_texts))
         batch_vectors = _embed_batch(batch_texts, embedding_model)
-        all_vectors.extend(batch_vectors)
-
-    # Create points for LanceDB
-    points = []
-    for idx, ((ticket_id, _chunk, payload), vector) in enumerate(zip(chunks, all_vectors)):
-        points.append(
+        if len(batch_vectors) != len(batch_chunks):
+            raise RuntimeError(
+                f"Embedding provider returned {len(batch_vectors)} vectors for {len(batch_chunks)} chunks."
+            )
+        points = []
+        for local_idx, ((ticket_id, _chunk, payload), vector) in enumerate(zip(batch_chunks, batch_vectors)):
+            points.append(
             {
-                "id": _stable_point_id(ticket_id, idx, source_name),
+                "id": _stable_point_id(ticket_id, i + local_idx, source_name),
                 "vector": [float(x) for x in vector],
                 "payload": payload,
             }
         )
+        for point_offset in range(0, len(points), point_batch_size):
+            batch_points = points[point_offset : point_offset + point_batch_size]
+            batch_inserted = lancedb_upsert_points(batch_points, delete_existing=False)
+            inserted += batch_inserted
+        del batch_vectors, points, batch_chunks, batch_texts
 
-    # Upsert to LanceDB in batches
-    inserted = 0
-    point_batch_size = 128
-    
-    for i in range(0, len(points), point_batch_size):
-        batch_points = points[i : i + point_batch_size]
-        batch_inserted = lancedb_upsert_points(batch_points)
-        inserted += batch_inserted
-        logger.debug("Batch %d: inserted %d points (total: %d)", i // point_batch_size + 1, batch_inserted, inserted)
+    del embedding_model, chunks
+    gc.collect()
 
     logger.info(
         "Successfully indexed %d chunks into LanceDB table '%s' from source '%s'",

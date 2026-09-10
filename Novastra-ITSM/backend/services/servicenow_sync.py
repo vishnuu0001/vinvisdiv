@@ -695,8 +695,6 @@ async def one_time_sync(
     # Write snapshot in a thread so we don't block the event loop
     await asyncio.to_thread(_write_servicenow_snapshot, snapshot_path, fetched_records)
 
-    docs = [_build_incident_doc(record, source_name) for record in fetched_records]
-
     chunks_indexed = 0
     qdrant_points_indexed = 0
     pg_incidents_persisted = 0
@@ -708,7 +706,9 @@ async def one_time_sync(
     _skip_pgvector_embed = cfg.VECTOR_BACKEND in {"lancedb"}
 
     if not _skip_pgvector_embed:
+        docs = [_build_incident_doc(record, source_name) for record in fetched_records]
         chunks_indexed = await _index_docs_to_pgvector(docs, snapshot_path, sync_log_id, fetched_records)
+        del docs
     else:
         logger.info("Skipping pgvector embedding (VECTOR_BACKEND=lancedb) — LanceDB is primary search store")
 

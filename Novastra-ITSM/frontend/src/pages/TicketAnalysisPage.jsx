@@ -451,6 +451,7 @@ export default function TicketAnalysisPage() {
   const onOneTimeSync = async () => {
     setSyncing(true)
     setSyncState(null)
+    const syncStartedAt = Date.now()
     try {
       const payload = {
         ...buildConnectionPayload(),
@@ -466,13 +467,41 @@ export default function TicketAnalysisPage() {
 
       let result = null
       for (let attempt = 0; attempt < SYNC_STATUS_MAX_POLLS; attempt++) {
-        const { data: job } = await snSyncJobStatus(jobId)
-        if (job.status === 'done') {
-          result = job.result || {}
-          break
-        }
-        if (job.status === 'error') {
-          throw new Error(job.error || 'Sync failed')
+        try {
+          const { data: job } = await snSyncJobStatus(jobId)
+          if (job.status === 'done') {
+            result = job.result || {}
+            break
+          }
+          if (job.status === 'error') {
+            throw new Error(job.error || 'Sync failed')
+          }
+        } catch (pollError) {
+          const status = pollError?.response?.status
+          const recoverable = !pollError?.response || [404, 502, 503, 504].includes(status)
+          if (!recoverable) throw pollError
+
+          // A large embedding run can finish and persist its durable sync marker
+          // immediately before the API process is recycled. Recover completion
+          // from that marker instead of turning a transient polling 502 into a
+          // false sync failure.
+          try {
+            const { data: durable } = await snSyncStatus()
+            const completedAt = Date.parse(durable.last_sync_at || '')
+            if (durable.can_chat && completedAt >= syncStartedAt - 5000) {
+              result = {
+                status: 'ok',
+                message: 'ServiceNow one-time sync completed.',
+                tickets_fetched: durable.tickets_fetched || 0,
+                chunks_indexed: durable.chunks_indexed || durable.total_chunks || 0,
+                source_name: durable.source_name || null,
+                recovered_from_sync_status: true,
+              }
+              break
+            }
+          } catch {
+            // The origin may still be restarting; retry the poll below.
+          }
         }
         await sleep(SYNC_STATUS_POLL_DELAY_MS)
       }

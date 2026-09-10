@@ -71,8 +71,37 @@ def ensure_table(vector_size: int) -> Any:
         return None
 
 
+# Function: delete_incidents
+def delete_incidents(incident_ids: list[str], batch_size: int = 500) -> int:
+    """Delete existing vectors once before a streamed incident re-index."""
+    cleaned_ids = sorted({str(value).strip() for value in incident_ids if str(value).strip()})
+    if not cleaned_ids:
+        return 0
+
+    client = get_lancedb_client()
+    table_name = cfg.LANCEDB_TABLE
+    if not _table_exists(client, table_name):
+        return 0
+
+    table = client.open_table(table_name)
+    deleted = 0
+    for offset in range(0, len(cleaned_ids), max(1, batch_size)):
+        batch = cleaned_ids[offset : offset + max(1, batch_size)]
+        escaped = [value.replace("'", "''") for value in batch]
+        id_list = ",".join(f"'{value}'" for value in escaped)
+        table.delete(f"incident_id IN ({id_list})")
+        deleted += len(batch)
+
+    try:
+        if hasattr(client, "close"):
+            client.close()
+    finally:
+        get_lancedb_client.cache_clear()
+    return deleted
+
+
 # Function: upsert_points
-def upsert_points(points: list[dict[str, Any]]) -> int:
+def upsert_points(points: list[dict[str, Any]], delete_existing: bool = True) -> int:
     """
     Upsert points into LanceDB table with required schema:
     - incident_id: incident identifier
@@ -125,14 +154,17 @@ def upsert_points(points: list[dict[str, Any]]) -> int:
             logger.debug("Created new LanceDB table '%s' with %d initial records", table_name, len(records))
         else:
             table = client.open_table(table_name)
-            # For updates, delete existing chunks for these incident_ids then re-add
-            existing_incident_ids = {r["incident_id"] for r in records if r["incident_id"]}
-            try:
-                if existing_incident_ids:
-                    id_list = ",".join(f"'{id_}'" for id_ in existing_incident_ids)
-                    table.delete(f"incident_id IN ({id_list})")
-            except Exception:
-                pass
+            # Single-record callers retain replace semantics. Bulk indexers delete
+            # every affected incident once up front, then stream append-only batches.
+            if delete_existing:
+                existing_incident_ids = {r["incident_id"] for r in records if r["incident_id"]}
+                try:
+                    if existing_incident_ids:
+                        escaped = [value.replace("'", "''") for value in existing_incident_ids]
+                        id_list = ",".join(f"'{value}'" for value in escaped)
+                        table.delete(f"incident_id IN ({id_list})")
+                except Exception:
+                    pass
             # Add new records
             table.add(records)
         
