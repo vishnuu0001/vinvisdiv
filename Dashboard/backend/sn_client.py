@@ -10,6 +10,7 @@ using basic authentication and cursor-based pagination.
 """
 
 import logging
+import re
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -66,6 +67,8 @@ class ServiceNowClient:
         self.password = password or settings.SERVICENOW_PASSWORD
         self.verify_ssl = verify_ssl if verify_ssl is not None else settings.SERVICENOW_VERIFY_SSL
         self.timeout = timeout_seconds or settings.SERVICENOW_TIMEOUT_SECONDS
+        self._session_cookies: Optional[httpx.Cookies] = None
+        self._session_user_token = ""
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -73,15 +76,51 @@ class ServiceNowClient:
 
     # Function: _build_client
     def _build_client(self) -> httpx.Client:
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        }
+        if self._session_user_token:
+            headers["X-UserToken"] = self._session_user_token
         return httpx.Client(
-            auth=(self.username, self.password),
+            auth=None if self._session_cookies else (self.username, self.password),
+            cookies=self._session_cookies,
             verify=self.verify_ssl,
             timeout=self.timeout,
-            headers={
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-            },
+            headers=headers,
         )
+
+    # Function: _authenticate_web_session
+    def _authenticate_web_session(self) -> bool:
+        """Establish a server-side ServiceNow UI session for instances that disable REST Basic auth."""
+        login_url = f"{self.base_url}/login.do"
+        try:
+            with httpx.Client(
+                verify=self.verify_ssl,
+                timeout=self.timeout,
+                follow_redirects=True,
+                headers={"Accept": "text/html,application/xhtml+xml"},
+            ) as client:
+                response = client.post(
+                    login_url,
+                    data={
+                        "user_name": self.username,
+                        "user_password": self.password,
+                        "sys_action": "sysverb_login",
+                    },
+                )
+                response.raise_for_status()
+                match = re.search(r"g_ck\s*=\s*['\"]([^'\"]+)['\"]", response.text or "")
+                if not match or not client.cookies:
+                    logger.warning("ServiceNow web-session fallback did not return a session token.")
+                    return False
+                self._session_cookies = httpx.Cookies(client.cookies)
+                self._session_user_token = match.group(1)
+                logger.info("ServiceNow web-session authentication fallback established.")
+                return True
+        except (httpx.HTTPError, ValueError) as exc:
+            logger.warning("ServiceNow web-session authentication fallback failed: %s", exc)
+            return False
 
     # Function: _table_url
     def _table_url(self, table: str) -> str:
@@ -213,6 +252,12 @@ class ServiceNowClient:
                     return second
                 return first
         except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 401 and self._authenticate_web_session():
+                try:
+                    with self._build_client() as client:
+                        return _probe_once(client)
+                except httpx.HTTPStatusError as session_exc:
+                    exc = session_exc
             return {
                 "success": False,
                 "status_code": exc.response.status_code,
