@@ -48,7 +48,6 @@ const SYNC_STATUS_POLL_DELAY_MS = 3000
 const DEMO_SERVICENOW_CONNECTION = {
   base_url: 'https://dev274740.service-now.com',
   username: 'admin',
-  password: 'zs8PWmCQ$v2+',
 }
 
 // Function: getChatAvailability
@@ -301,7 +300,7 @@ export default function TicketAnalysisPage() {
     auth_type: 'basic',
     base_url: DEMO_SERVICENOW_CONNECTION.base_url,
     username: DEMO_SERVICENOW_CONNECTION.username,
-    password: DEMO_SERVICENOW_CONNECTION.password,
+    password: '',
     client_id: '',
     client_secret: '',
   })
@@ -312,7 +311,7 @@ export default function TicketAnalysisPage() {
   const [syncState, setSyncState] = useState(null)
   const [syncGate, setSyncGate] = useState(null)
   const [serverCredentials, setServerCredentials] = useState({ basic: false, oauth: false })
-  const [useServerCredentials, setUseServerCredentials] = useState(false)
+  const [useServerCredentials, setUseServerCredentials] = useState(true)
 
   const [chatMessages, setChatMessages] = useState([])
   const [supportSessionId, setSupportSessionId] = useState(null)
@@ -360,10 +359,8 @@ export default function TicketAnalysisPage() {
     refreshSyncGate()
   }, [])
 
-  // Prefill the connection form from the backend's own .env config (base URL,
-  // username, OAuth client ID) so it doesn't need to be typed in every time.
-  // Passwords/secrets are never sent here -- leaving those fields blank still
-  // works, since the backend falls back to its own configured secret on submit.
+  // Keep the non-secret demo connection values visible in the form. The password
+  // remains server-side and is represented by a masked configured-value prompt.
   useEffect(() => {
     (async () => {
       try {
@@ -371,7 +368,7 @@ export default function TicketAnalysisPage() {
         const hasBasic = Boolean(data.has_password_configured)
         const hasOauth = hasBasic && Boolean(data.has_client_secret_configured)
         setServerCredentials({ basic: hasBasic, oauth: hasOauth })
-        setUseServerCredentials(false)
+        setUseServerCredentials(hasBasic)
         setConn((p) => ({
           ...p,
           base_url: p.base_url || data.base_url || '',
@@ -740,7 +737,9 @@ export default function TicketAnalysisPage() {
                 autoComplete="new-password"
                 disabled={useServerCredentials && (conn.auth_type === 'oauth' ? serverCredentials.oauth : serverCredentials.basic)}
                 className="w-full rounded-md border border-[#c8c6c4] bg-white text-slate-900 px-3 py-2 text-sm"
-                placeholder="Leave blank to use the server-configured password"
+                placeholder={useServerCredentials && serverCredentials.basic
+                  ? '•••••••••••• (server configured)'
+                  : 'Enter password or API token'}
                 value={conn.password}
                 onChange={(e) => setConn((p) => ({ ...p, password: e.target.value }))}
               />
