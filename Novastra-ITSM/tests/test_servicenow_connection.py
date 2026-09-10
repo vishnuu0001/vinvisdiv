@@ -18,6 +18,11 @@ class _AsyncClientContext:
     def __init__(self, response: httpx.Response):
         self.client = AsyncMock()
         self.client.get.return_value = response
+        self.client.post.return_value = httpx.Response(
+            200,
+            text="<html><title>ServiceNow login</title></html>",
+            request=httpx.Request("POST", "https://example.service-now.com/login.do"),
+        )
 
     async def __aenter__(self):
         return self.client
@@ -61,6 +66,45 @@ class ServiceNowConnectionTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result["ok"])
         self.assertEqual(result["status_code"], 403)
         self.assertIn("denied access", result["message"].lower())
+
+    async def test_basic_401_falls_back_to_browser_session(self):
+        table_request = httpx.Request(
+            "GET", "https://example.service-now.com/api/now/table/incident"
+        )
+        context = _AsyncClientContext(httpx.Response(401, request=table_request))
+        context.client.get.side_effect = [
+            httpx.Response(401, request=table_request),
+            httpx.Response(200, json={"result": [{"sys_id": "abc"}]}, request=table_request),
+        ]
+        context.client.post.return_value = httpx.Response(
+            200,
+            text="<script>var g_ck = 'session-user-token';</script>",
+            request=httpx.Request("POST", "https://example.service-now.com/login.do"),
+        )
+
+        with (
+            patch(
+                "backend.services.servicenow_sync._auth_kwargs",
+                new=AsyncMock(return_value=({"auth": ("user", "secret")}, {})),
+            ),
+            patch(
+                "backend.services.servicenow_sync.httpx.AsyncClient",
+                return_value=context,
+            ),
+        ):
+            result = await check_connection(
+                base_url="https://example.service-now.com",
+                username="user",
+                password="secret",
+                timeout_seconds=10,
+                verify_ssl=True,
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["sample_records"], 1)
+        retry_headers = context.client.get.await_args_list[1].kwargs["headers"]
+        self.assertEqual(retry_headers["X-UserToken"], "session-user-token")
+        self.assertNotIn("auth", context.client.get.await_args_list[1].kwargs)
 
 
 if __name__ == "__main__":
