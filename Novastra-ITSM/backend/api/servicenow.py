@@ -30,6 +30,7 @@ from backend.models.schemas import (
 )
 from backend.rag.document_loader import load_image_bytes
 from backend.rag.pipeline import query_rag
+from backend.security.crypto import decrypt_credential_envelope, encrypt_credential_envelope
 from backend.services.servicenow_sync import one_time_sync, test_connection
 from backend.services.sync_status_store import get_sync_status
 
@@ -83,10 +84,15 @@ def _resolve_sn_credentials(
     base_url: Optional[str],
     username: Optional[str],
     password: Optional[str],
+    encrypted_password: Optional[str] = None,
 ) -> tuple[str, str, str]:
     resolved_base = _normalize_instance_url(base_url or cfg.SERVICENOW_BASE_URL or "")
     resolved_user = _clean_credential(username or cfg.SERVICENOW_USERNAME)
-    resolved_pass = _clean_credential(password or cfg.SERVICENOW_PASSWORD)
+    try:
+        decrypted_password = decrypt_credential_envelope(encrypted_password)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    resolved_pass = _clean_credential(decrypted_password or password or cfg.SERVICENOW_PASSWORD)
 
     if not all([resolved_base, resolved_user, resolved_pass]):
         raise HTTPException(
@@ -184,19 +190,18 @@ async def fetch_and_resolve(request: ServiceNowTicketRequest):
 # Function: get_servicenow_connection_defaults
 @router.get("/connection-defaults")
 async def get_servicenow_connection_defaults():
-    """Non-secret connection info sourced from server-side config, so the frontend
-    can prefill the connection form instead of requiring manual re-entry every
-    time. Passwords/client secrets are intentionally never returned here -- when
-    the form is submitted with those fields left blank, the backend already
-    falls back to its own configured SERVICENOW_PASSWORD/SERVICENOW_CLIENT_SECRET
-    (see _resolve_sn_credentials / _resolve_sn_oauth_credentials), so leaving
-    them blank is fully functional, not just a display convenience."""
+    """Return connection defaults and a short-lived encrypted password envelope.
+
+    Plaintext credentials and encryption keys never leave the backend. The opaque
+    envelope can only be decrypted by this service and expires after one hour.
+    """
     has_basic = bool(cfg.SERVICENOW_BASE_URL and cfg.SERVICENOW_USERNAME and cfg.SERVICENOW_PASSWORD)
     has_oauth = bool(cfg.SERVICENOW_CLIENT_ID and cfg.SERVICENOW_CLIENT_SECRET)
     return {
         "base_url": cfg.SERVICENOW_BASE_URL or None,
         "username": cfg.SERVICENOW_USERNAME or None,
         "client_id": cfg.SERVICENOW_CLIENT_ID or None,
+        "encrypted_password": encrypt_credential_envelope(cfg.SERVICENOW_PASSWORD),
         "has_password_configured": has_basic,
         "has_client_secret_configured": has_oauth,
         "suggested_auth_type": "oauth" if has_oauth else ("basic" if has_basic else None),
@@ -214,6 +219,7 @@ async def test_servicenow_connection(request: ServiceNowConnectionRequest):
         request.base_url,
         request.username,
         request.password,
+        request.encrypted_password,
     )
     client_id, client_secret = "", ""
     if request.auth_type == "oauth":
@@ -266,6 +272,7 @@ async def sync_servicenow_tickets(request: ServiceNowSyncRequest):
         request.base_url,
         request.username,
         request.password,
+        request.encrypted_password,
     )
     client_id, client_secret = "", ""
     if request.auth_type == "oauth":

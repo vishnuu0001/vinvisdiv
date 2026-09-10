@@ -96,6 +96,7 @@ class ServiceNowConnectionRequest(BaseModel):
     base_url: Optional[str] = None
     username: Optional[str] = None
     password: Optional[str] = None
+    encrypted_password: Optional[str] = None
     # OAuth (resource owner password credentials grant) — set both to authenticate
     # via bearer token instead of basic auth, for instances with basic auth disabled.
     client_id: Optional[str] = None
@@ -107,6 +108,7 @@ class ServiceNowSyncRequest(BaseModel):
     base_url: Optional[str] = None
     username: Optional[str] = None
     password: Optional[str] = None
+    encrypted_password: Optional[str] = None
     client_id: Optional[str] = None
     client_secret: Optional[str] = None
     auth_type: str = "basic"

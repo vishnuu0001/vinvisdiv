@@ -301,6 +301,7 @@ export default function TicketAnalysisPage() {
     base_url: DEMO_SERVICENOW_CONNECTION.base_url,
     username: DEMO_SERVICENOW_CONNECTION.username,
     password: '',
+    passwordEncrypted: false,
     client_id: '',
     client_secret: '',
   })
@@ -373,6 +374,8 @@ export default function TicketAnalysisPage() {
           ...p,
           base_url: p.base_url || data.base_url || '',
           username: p.username || data.username || '',
+          password: data.encrypted_password || p.password,
+          passwordEncrypted: Boolean(data.encrypted_password),
           client_id: p.client_id || data.client_id || '',
         }))
       } catch {
@@ -388,17 +391,23 @@ export default function TicketAnalysisPage() {
       : serverCredentials.basic
 
     // Never let password-manager autofill override verified server secrets.
-    // When server credentials are selected, omitting every credential field
-    // makes the backend resolve the complete matching set from its own config.
+    // Prefer the populated encrypted envelope; older backends can still resolve
+    // the complete credential set when no envelope is available.
     if (useServerCredentials && serverAuthAvailable) {
-      return { auth_type: conn.auth_type }
+      return {
+        auth_type: conn.auth_type,
+        base_url: conn.base_url || undefined,
+        username: conn.username || undefined,
+        encrypted_password: conn.passwordEncrypted ? conn.password || undefined : undefined,
+      }
     }
 
     return {
       auth_type: conn.auth_type,
       base_url: conn.base_url || undefined,
       username: conn.username || undefined,
-      password: conn.password || undefined,
+      password: conn.passwordEncrypted ? undefined : conn.password || undefined,
+      encrypted_password: conn.passwordEncrypted ? conn.password || undefined : undefined,
       client_id: conn.auth_type === 'oauth' ? conn.client_id || undefined : undefined,
       client_secret: conn.auth_type === 'oauth' ? conn.client_secret || undefined : undefined,
     }
@@ -646,7 +655,7 @@ export default function TicketAnalysisPage() {
   // Function: onDisconnect
   const onDisconnect = async () => {
     setConnectionState('disconnected')
-    setConn((prev) => ({ ...prev, username: '', password: '' }))
+    setConn((prev) => ({ ...prev, username: '', password: '', passwordEncrypted: false }))
     setChatMessages([])
     setChatInput('')
     setFeatureResult(null)
@@ -737,11 +746,13 @@ export default function TicketAnalysisPage() {
                 autoComplete="new-password"
                 disabled={useServerCredentials && (conn.auth_type === 'oauth' ? serverCredentials.oauth : serverCredentials.basic)}
                 className="w-full rounded-md border border-[#c8c6c4] bg-white text-slate-900 px-3 py-2 text-sm"
-                placeholder={useServerCredentials && serverCredentials.basic
-                  ? '•••••••••••• (server configured)'
-                  : 'Enter password or API token'}
+                placeholder="Enter password or API token"
                 value={conn.password}
-                onChange={(e) => setConn((p) => ({ ...p, password: e.target.value }))}
+                onChange={(e) => setConn((p) => ({
+                  ...p,
+                  password: e.target.value,
+                  passwordEncrypted: false,
+                }))}
               />
             </div>
             {conn.auth_type === 'oauth' && (
