@@ -14,6 +14,8 @@ from typing import Optional
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from security.crypto import decrypt_value
+
 
 class Settings(BaseSettings):
     """Application settings loaded from environment / .env file."""
@@ -30,6 +32,10 @@ class Settings(BaseSettings):
     )
     SERVICENOW_USERNAME: str = Field(default="", description="ServiceNow basic-auth username")
     SERVICENOW_PASSWORD: str = Field(default="", description="ServiceNow basic-auth password")
+    SERVICENOW_PASSWORD_ENCRYPTED: str = Field(
+        default="",
+        description="Fernet-encrypted ServiceNow password; preferred over SERVICENOW_PASSWORD",
+    )
     SERVICENOW_VERIFY_SSL: bool = Field(
         default=True, description="Whether to verify SSL certificates when calling ServiceNow"
     )
@@ -116,6 +122,11 @@ class Settings(BaseSettings):
     # in production racing the watchdog's liveness check and causing a spurious extra
     # restart. 10s was too patient for a value on the hot startup path.
     POSTGRES_POOL_TIMEOUT_SECONDS: float = Field(default=3.0, description="Pool checkout timeout (seconds)")
+
+    def model_post_init(self, __context: object) -> None:
+        """Resolve an encrypted deployment password only inside the backend process."""
+        if self.SERVICENOW_PASSWORD_ENCRYPTED:
+            self.SERVICENOW_PASSWORD = decrypt_value(self.SERVICENOW_PASSWORD_ENCRYPTED) or ""
 
 
 # Module-level singleton – import this throughout the app
