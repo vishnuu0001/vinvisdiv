@@ -47,7 +47,7 @@ FIELD_MAP = {
     "assigned to": "u_assigned_to",
     "on hold reason": "u_hold_reason",
     "external url": "u_external_url",
-    "change request": "rfc",
+    "change request": "u_change_request",
     "configuration item": "u_cmdb_ci",
     "resolution notes": "u_close_notes",
     "resolution code": "u_close_code",
@@ -105,7 +105,7 @@ SCHEMA_FIELDS = {
     "u_hold_reason": ("On Hold Reason", "string", 255),
     "u_external_url": ("External URL", "string", 4000),
     "u_cmdb_ci": ("Configuration Item", "string", 255),
-    "rfc": ("Change Request", "string", 255),
+    "u_change_request": ("Change Request", "string", 255),
 }
 
 
