@@ -457,6 +457,11 @@ def parse_args() -> argparse.Namespace:
         default=MAX_IMPORT_ROWS,
         help=f"Maximum records to process (hard-capped at {MAX_IMPORT_ROWS}).",
     )
+    parser.add_argument(
+        "--all-rows",
+        action="store_true",
+        help="Process the complete workbook, overriding the demo safety cap.",
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--verify-only", action="store_true")
     parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
@@ -469,8 +474,9 @@ def main() -> int:
     if not args.excel.exists():
         raise FileNotFoundError(args.excel)
     rows = load_rows(args.excel, args.sheet)
-    requested_rows = args.max_rows if args.max_rows > 0 else MAX_IMPORT_ROWS
-    rows = rows[:min(requested_rows, MAX_IMPORT_ROWS)]
+    if not args.all_rows:
+        requested_rows = args.max_rows if args.max_rows > 0 else MAX_IMPORT_ROWS
+        rows = rows[:min(requested_rows, MAX_IMPORT_ROWS)]
     print(f"Workbook rows: {len(rows)}; target: {credentials.base_url}; credentials: configured")
 
     if args.dry_run:
