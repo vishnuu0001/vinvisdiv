@@ -309,7 +309,12 @@ class ServiceNowClient:
         )
 
     # Function: create_critical_incident
-    def create_critical_incident(self, short_description: str, description: str) -> Dict[str, Any]:
+    def create_critical_incident(
+        self,
+        short_description: str,
+        description: str,
+        requested_number: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         Create a P1/Critical incident in ServiceNow via the Table API.
         Returns the created record or an error dict.
@@ -325,13 +330,24 @@ class ServiceNowClient:
             "category": "software",
             "caller_id": self.username,
         }
-        try:
+        if requested_number:
+            payload["number"] = requested_number
+
+        def _post_once() -> Dict[str, Any]:
             with self._build_client() as client:
                 response = client.post(url, json=payload)
                 response.raise_for_status()
-                result = response.json().get("result", {})
-                logger.info("Created critical incident: %s", result.get("number"))
-                return {"success": True, "number": result.get("number"), "sys_id": result.get("sys_id")}
+                return response.json().get("result", {})
+
+        try:
+            try:
+                result = _post_once()
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code != 401 or not self._authenticate_web_session():
+                    raise
+                result = _post_once()
+            logger.info("Created critical incident: %s", result.get("number"))
+            return {"success": True, "number": result.get("number"), "sys_id": result.get("sys_id")}
         except httpx.HTTPStatusError as exc:
             logger.error("Failed to create critical incident: %s", exc.response.text)
             return {"success": False, "message": f"HTTP {exc.response.status_code}: {exc.response.text[:200]}"}

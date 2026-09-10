@@ -1180,8 +1180,12 @@ def invoke_critical_incident(req: InvokeRequest = InvokeRequest()) -> Dict[str, 
     sn_result: Dict[str, Any] = {"success": False}
     if settings.SERVICENOW_BASE_URL and settings.SERVICENOW_USERNAME:
         try:
-            client = ServiceNowClient()
-            sn_result = client.create_critical_incident(req.short_description, req.description)
+            client = _get_client()
+            sn_result = client.create_critical_incident(
+                req.short_description,
+                req.description,
+                requested_number=synthetic_number,
+            )
             if sn_result.get("number"):
                 synthetic_number = sn_result["number"]
         except Exception as exc:
