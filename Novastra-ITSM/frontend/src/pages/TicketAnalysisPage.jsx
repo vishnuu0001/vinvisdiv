@@ -45,6 +45,11 @@ const MAX_FEATURE_TRANSCRIPT_CHARS = 1800
 // continues server-side, and the UI must not report a false timeout after 12m.
 const SYNC_STATUS_MAX_POLLS = 7200
 const SYNC_STATUS_POLL_DELAY_MS = 3000
+const DEMO_SERVICENOW_CONNECTION = {
+  base_url: 'https://dev274740.service-now.com',
+  username: 'admin',
+  password: 'zs8PWmCQ$v2+',
+}
 
 // Function: getChatAvailability
 const getChatAvailability = (canChat, isConnected) => {
@@ -294,9 +299,9 @@ export default function TicketAnalysisPage() {
   const [conn, setConn] = useState({
     provider: 'ServiceNow',
     auth_type: 'basic',
-    base_url: '',
-    username: '',
-    password: '',
+    base_url: DEMO_SERVICENOW_CONNECTION.base_url,
+    username: DEMO_SERVICENOW_CONNECTION.username,
+    password: DEMO_SERVICENOW_CONNECTION.password,
     client_id: '',
     client_secret: '',
   })
@@ -366,10 +371,9 @@ export default function TicketAnalysisPage() {
         const hasBasic = Boolean(data.has_password_configured)
         const hasOauth = hasBasic && Boolean(data.has_client_secret_configured)
         setServerCredentials({ basic: hasBasic, oauth: hasOauth })
-        setUseServerCredentials(data.suggested_auth_type === 'oauth' ? hasOauth : hasBasic)
+        setUseServerCredentials(false)
         setConn((p) => ({
           ...p,
-          auth_type: data.suggested_auth_type || p.auth_type,
           base_url: p.base_url || data.base_url || '',
           username: p.username || data.username || '',
           client_id: p.client_id || data.client_id || '',
